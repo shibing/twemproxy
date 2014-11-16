@@ -21,6 +21,7 @@ bin_PROGRAMS = nutcracker
 
 nutcracker_SOURCES =			\
 	nc_core.c nc_core.h		\
+	nc_process.c nc_process.h	\
 	nc_connection.c nc_connection.h	\
 	nc_client.c nc_client.h		\
 	nc_server.c nc_server.h		\

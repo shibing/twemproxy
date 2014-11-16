@@ -506,7 +506,7 @@ nc_post_run(struct instance *nci)
 static void
 nc_run(struct instance *nci)
 {
-    rstatus_t status;
+    //rstatus_t status;
     struct context *ctx;
 
     ctx = core_start(nci);
@@ -516,10 +516,13 @@ nc_run(struct instance *nci)
 
     /* run rabbit run */
     for (;;) {
-        status = core_loop(ctx);
-        if (status != NC_OK) {
-            break;
-        }
+        //status = core_loop(ctx);
+        //if (status != NC_OK) {
+        //    break;
+        //}
+        //TODO just sleep now
+        //later will process some signal here
+        sleep(10);
     }
 
     core_stop(ctx);

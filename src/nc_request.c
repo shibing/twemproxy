@@ -18,6 +18,7 @@
 #include <nc_core.h>
 #include <nc_server.h>
 #include <nc_event.h>
+#include <nc_process.h>
 
 struct msg *
 req_get(struct conn *conn)
@@ -413,7 +414,7 @@ req_forward_error(struct context *ctx, struct conn *conn, struct msg *msg)
     }
 
     if (req_done(conn, TAILQ_FIRST(&conn->omsg_q))) {
-        status = event_add_out(ctx->ep, conn);
+        status = event_add_out(nc_processes[nc_current_process_slot].ep, conn);
         if (status != NC_OK) {
             conn->err = errno;
         }
@@ -482,7 +483,7 @@ req_forward(struct context *ctx, struct conn *c_conn, struct msg *msg)
 
     /* enqueue the message (request) into server inq */
     if (TAILQ_EMPTY(&s_conn->imsg_q)) {
-        status = event_add_out(ctx->ep, s_conn);
+        status = event_add_out(nc_processes[nc_current_process_slot].ep, s_conn);
         if (status != NC_OK) {
             req_forward_error(ctx, c_conn, msg);
             s_conn->err = errno;
@@ -533,7 +534,7 @@ req_send_next(struct context *ctx, struct conn *conn)
     nmsg = TAILQ_FIRST(&conn->imsg_q);
     if (nmsg == NULL) {
         /* nothing to send as the server inq is empty */
-        status = event_del_out(ctx->ep, conn);
+        status = event_del_out(nc_processes[nc_current_process_slot].ep, conn);
         if (status != NC_OK) {
             conn->err = errno;
         }

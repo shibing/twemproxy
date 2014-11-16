@@ -25,6 +25,7 @@
 #include <nc_conf.h>
 #include <nc_server.h>
 #include <nc_proxy.h>
+#include <nc_process.h>
 
 static uint32_t ctx_id; /* context generation */
 
@@ -83,17 +84,19 @@ core_ctx_create(struct instance *nci)
         return NULL;
     }
 
+    //TODO not preconnect here, will process it in each process
+
     /* preconnect? servers in server pool */
-    status = server_pool_preconnect(ctx);
-    if (status != NC_OK) {
-        server_pool_disconnect(ctx);
-        event_deinit(ctx);
-        stats_destroy(ctx->stats);
-        server_pool_deinit(&ctx->pool);
-        conf_destroy(ctx->cf);
-        nc_free(ctx);
-        return NULL;
-    }
+    //status = server_pool_preconnect(ctx);
+    //if (status != NC_OK) {
+    //    server_pool_disconnect(ctx);
+    //    event_deinit(ctx);
+    //    stats_destroy(ctx->stats);
+    //    server_pool_deinit(&ctx->pool);
+    //    conf_destroy(ctx->cf);
+    //    nc_free(ctx);
+    //    return NULL;
+    //}
 
     /* initialize proxy per server pool */
     status = proxy_init(ctx);
@@ -106,6 +109,29 @@ core_ctx_create(struct instance *nci)
         nc_free(ctx);
         return NULL;
     }
+
+    pid_t pid; 
+    int i = 0;
+    //TODO need change 8 to MARCRO
+    for(i =0; i< 8; ++i){
+       pid = fork();
+       switch (pid) {
+       case -1:
+           log_error("fork() failed: %s", strerror(errno));
+           return NULL;
+
+       case 0:
+           //TODO do child process
+           process_loop(ctx,i);
+           exit(1);
+           break;
+
+       default:
+           /* parent terminates */
+           break;
+       }
+
+    } 
 
     log_debug(LOG_VVERB, "created ctx %p id %"PRIu32"", ctx, ctx->id);
 
@@ -206,9 +232,9 @@ core_close(struct context *ctx, struct conn *conn)
               conn->eof, conn->done, conn->recv_bytes, conn->send_bytes,
               conn->err ? ':' : ' ', conn->err ? strerror(conn->err) : "");
 
-    status = event_del_conn(ctx->ep, conn);
+    status = event_del_conn(nc_processes[nc_current_process_slot].ep, conn);
     if (status < 0) {
-        log_warn("event del conn e %d %c %d failed, ignored: %s", ctx->ep,
+        log_warn("event del conn e %d %c %d failed, ignored: %s", nc_processes[nc_current_process_slot].ep,
                  type, conn->sd, strerror(errno));
     }
 
@@ -315,7 +341,8 @@ core_loop(struct context *ctx)
 {
     int i, nsd;
 
-    nsd = event_wait(ctx->ep, ctx->event, ctx->nevent, ctx->timeout);
+    //TODO ctx->event need to move to process 
+    nsd = event_wait(nc_processes[nc_current_process_slot].ep, ctx->event, ctx->nevent, ctx->timeout);
     if (nsd < 0) {
         return nsd;
     }

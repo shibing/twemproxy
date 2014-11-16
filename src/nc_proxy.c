@@ -21,6 +21,7 @@
 #include <nc_server.h>
 #include <nc_event.h>
 #include <nc_proxy.h>
+#include <nc_process.h>
 
 void
 proxy_ref(struct conn *conn, void *owner)
@@ -163,21 +164,6 @@ proxy_listen(struct context *ctx, struct conn *p)
         return NC_ERROR;
     }
 
-    status = event_add_conn(ctx->ep, p);
-    if (status < 0) {
-        log_error("event add conn e %d p %d on addr '%.*s' failed: %s",
-                  ctx->ep, p->sd, pool->addrstr.len, pool->addrstr.data,
-                  strerror(errno));
-        return NC_ERROR;
-    }
-
-    status = event_del_out(ctx->ep, p);
-    if (status < 0) {
-        log_error("event del out e %d p %d on addr '%.*s' failed: %s",
-                  ctx->ep, p->sd, pool->addrstr.len, pool->addrstr.data,
-                  strerror(errno));
-        return NC_ERROR;
-    }
 
     return NC_OK;
 }
@@ -325,7 +311,7 @@ proxy_accept(struct context *ctx, struct conn *p)
         }
     }
 
-    status = event_add_conn(ctx->ep, c);
+    status = event_add_conn(nc_processes[nc_current_process_slot].ep, c);
     if (status < 0) {
         log_error("event add conn of c %d from p %d failed: %s", c->sd, p->sd,
                   strerror(errno));
