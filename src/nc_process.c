@@ -69,6 +69,12 @@ static void nc_process_init(struct context *ctx,nc_process_t *process){
 void
 process_loop(struct context *ctx,int process_index)
 {
+    //rstatus_t status = pthread_create(&ctx->stats->tid, NULL, stats_loop, ctx->stats);
+    //if (status < 0) {
+    //    log_error("stats aggregator create failed: %s", strerror(status));
+    //    return NC_ERROR;
+    //}
+
     nc_processes[process_index].pid = getpid();
     nc_current_process_slot = process_index;
     nc_process_init(ctx,&nc_processes[process_index]);

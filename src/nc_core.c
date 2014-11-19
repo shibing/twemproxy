@@ -64,8 +64,27 @@ core_ctx_create(struct instance *nci)
         return NULL;
     }
 
+
+    //create socket pair
+    //TODO check whether child can send message to master
+    //TODO move these codes to function
+    if(socketpair(AF_UNIX, SOCK_STREAM, 0, ctx->channel) == -1){
+        log_error("[master] sockpair create domain socket failed");
+    }
+    //set noblock
+    status = nc_set_nonblocking(ctx->channel[0]);
+    if (status < 0) {
+        log_error("set nonblock on p %d ", ctx->channel[0]);
+        return NC_ERROR;
+    }
+    status = nc_set_nonblocking(ctx->channel[1]);
+    if (status < 0) {
+        log_error("set nonblock on p %d ", ctx->channel[0]);
+        return NC_ERROR;
+    }
+
     /* create stats per server pool */
-    ctx->stats = stats_create(nci->stats_port, nci->stats_addr, nci->stats_interval,
+    ctx->stats = stats_create(ctx,nci->stats_port, nci->stats_addr, nci->stats_interval,
                               nci->hostname, &ctx->pool);
     if (ctx->stats == NULL) {
         server_pool_deinit(&ctx->pool);
@@ -109,6 +128,12 @@ core_ctx_create(struct instance *nci)
         nc_free(ctx);
         return NULL;
     }
+
+
+
+
+     
+
 
     pid_t pid; 
     int i = 0;
@@ -336,12 +361,65 @@ core_core(struct context *ctx, struct conn *conn, uint32_t events)
     }
 }
 
+#define MSG_DATA "xyz"
+#define MSG_LEN sizeof(MSG_DATA)
+
+static void send_message(int fd) {
+    int ret;
+    int i;
+ 
+    struct msghdr msghdr;
+    struct iovec iov[1];
+    union {
+        struct cmsghdr cm;
+        char data[CMSG_SPACE(sizeof(int))];
+    } cmsg;
+ 
+ 
+    cmsg.cm.cmsg_len = CMSG_LEN(sizeof(int));
+    cmsg.cm.cmsg_level = SOL_SOCKET;
+    cmsg.cm.cmsg_type = SCM_RIGHTS;
+    *(int*)CMSG_DATA(&(cmsg.cm)) = NULL;
+
+    char buf[128];
+    sprintf(buf,"come from pid=%d",getpid());
+    iov[0].iov_base = buf;
+    iov[0].iov_len = strlen(buf);
+    //iov[1].iov_base = MSG_DATA;
+    //iov[1].iov_len = MSG_LEN;
+    //iov[2].iov_base = MSG_DATA;
+    //iov[2].iov_len = MSG_LEN;
+    //iov[3].iov_base = MSG_DATA;
+    //iov[3].iov_len = MSG_LEN;
+ 
+    msghdr.msg_name = NULL;
+    msghdr.msg_namelen = 0;
+    msghdr.msg_iov = iov;
+    msghdr.msg_iovlen = 1;
+    msghdr.msg_control = (caddr_t)&cmsg;
+    msghdr.msg_controllen = sizeof(cmsg);
+ 
+    log_error( "to send %d pid = %d", MSG_LEN,getpid() );
+ 
+    for( i=0; i<2; i++ )
+    {
+        ret = sendmsg( fd, &msghdr, MSG_DONTWAIT );
+        if( ret < 0 )
+        {
+            log_error( "sendmsg failed" );
+            continue;
+        }
+ 
+    }
+ 
+    return 0;
+}
+
 rstatus_t
 core_loop(struct context *ctx)
 {
     int i, nsd;
 
-    //TODO ctx->event need to move to process 
     nsd = event_wait(nc_processes[nc_current_process_slot].ep, ctx->event, ctx->nevent, ctx->timeout);
     if (nsd < 0) {
         return nsd;
@@ -357,5 +435,9 @@ core_loop(struct context *ctx)
 
     stats_swap(ctx->stats);
 
+   
+    //TODO just send msg here for test
+    send_message(ctx->channel[1]);
+ 
     return NC_OK;
 }

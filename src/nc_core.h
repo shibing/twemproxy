@@ -107,6 +107,7 @@ struct context {
     int                max_timeout; /* epoll wait max timeout in msec */
     int                timeout;     /* epoll wait timeout in msec */
     struct epoll_event *event;      /* epoll event */
+    int channel[2];                /* socket pair */
 };
 
 struct instance {

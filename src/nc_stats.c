@@ -770,14 +770,66 @@ stats_send_rsp(struct stats *st)
     return NC_OK;
 }
 
-static void *
+static int receive_message( int fd )
+{
+    int ret;
+    int i;
+    unsigned char buf[10];
+ 
+    struct msghdr msghdr;
+    struct iovec iov[1];
+    union {
+        struct cmsghdr cm;
+        char data[CMSG_SPACE(sizeof(int))];
+    } cmsg;
+ 
+    iov[0].iov_base = buf;
+    iov[0].iov_len = sizeof(buf);
+ 
+    msghdr.msg_name = NULL;
+    msghdr.msg_namelen = 0;
+    msghdr.msg_iov = iov;
+    msghdr.msg_iovlen = 1;
+    msghdr.msg_control = (caddr_t)&cmsg;
+    msghdr.msg_controllen = sizeof(cmsg);
+ 
+ 
+    //for( i=0; i<4; i++ )
+    //{
+        ret = recvmsg( fd, &msghdr, 0 );
+        if( ret < 0 )
+        {
+            log_error( "recvmsg failed" );
+        }
+ 
+        if( cmsg.cm.cmsg_len < CMSG_LEN(sizeof(int)) )
+        {
+            log_error( "msg control data len %u", cmsg.cm.cmsg_len );
+        }
+        if( cmsg.cm.cmsg_level != SOL_SOCKET || cmsg.cm.cmsg_type != SCM_RIGHTS )
+        {
+            log_error( "msg control level %d, type %d", cmsg.cm.cmsg_level, cmsg.cm.cmsg_type );
+        }
+        char *temp = msghdr.msg_iov[0].iov_base;
+        temp[ret] = '\0';
+        log_error("get message:%s", temp);
+ 
+    //}
+ 
+    return 0;
+}
+
+void *
 stats_loop(void *arg)
 {
-    struct stats *st = arg;
+    struct context *ctx = arg;
+    struct stats *st = ctx->stats;
     int n;
+    int i;
 
     for (;;) {
-        n = epoll_wait(st->ep, &st->event, 1, st->interval);
+        struct epoll_event events[1023];
+        n = epoll_wait(st->ep, events, 1024, st->interval);
         if (n < 0) {
             if (errno == EINTR) {
                 continue;
@@ -787,15 +839,31 @@ stats_loop(void *arg)
             break;
         }
 
-        /* aggregate stats from shadow (b) -> sum (c) */
-        stats_aggregate(st);
+        for (i=0; i<n; ++i){
+            if(events[i].data.fd == st->sd){
+                //stats thread socket listening comming in
+                /* aggregate stats from shadow (b) -> sum (c) */
+                st->event = events[i];
+                stats_aggregate(st);
+                if (n == 0) {
+                    continue;
+                }
+        
+                /* send aggregate stats sum (c) to collector */
+                stats_send_rsp(st);
 
-        if (n == 0) {
-            continue;
+            } else if( events[i].data.fd == ctx->channel[0] && events[i].events&EPOLLIN ){
+                receive_message(ctx->channel[0]);        
+                log_error("channel 0 come in"); 
+        
+            }
+
+            log_error("event coming in %p",events[i].data.fd);
+
+            
+
         }
 
-        /* send aggregate stats sum (c) to collector */
-        stats_send_rsp(st);
     }
 
     return NULL;
@@ -844,7 +912,7 @@ stats_listen(struct stats *st)
 }
 
 static rstatus_t
-stats_start_aggregator(struct stats *st)
+stats_start_aggregator(struct context *ctx,struct stats *st)
 {
     rstatus_t status;
     struct epoll_event ev;
@@ -874,7 +942,19 @@ stats_start_aggregator(struct stats *st)
         return NC_ERROR;
     }
 
-    status = pthread_create(&st->tid, NULL, stats_loop, st);
+    struct epoll_event channel_ev;
+    channel_ev.data.fd = ctx->channel[0];
+    channel_ev.events = EPOLLIN;
+
+    status = epoll_ctl(st->ep, EPOLL_CTL_ADD, ctx->channel[0], &channel_ev);
+    if (status < 0) {
+        log_error("epoll ctl on e %d sd %d failed: %s", st->ep, st->sd,
+                  strerror(errno));
+        return NC_ERROR;
+    }
+
+
+    status = pthread_create(&st->tid, NULL, stats_loop, ctx);
     if (status < 0) {
         log_error("stats aggregator create failed: %s", strerror(status));
         return NC_ERROR;
@@ -895,7 +975,7 @@ stats_stop_aggregator(struct stats *st)
 }
 
 struct stats *
-stats_create(uint16_t stats_port, char *stats_ip, int stats_interval,
+stats_create(struct context *ctx,uint16_t stats_port, char *stats_ip, int stats_interval,
              char *source, struct array *server_pool)
 {
     rstatus_t status;
@@ -961,7 +1041,7 @@ stats_create(uint16_t stats_port, char *stats_ip, int stats_interval,
         goto error;
     }
 
-    status = stats_start_aggregator(st);
+    status = stats_start_aggregator(ctx,st);
     if (status != NC_OK) {
         goto error;
     }
@@ -1052,8 +1132,8 @@ _stats_pool_incr(struct context *ctx, struct server_pool *pool,
     ASSERT(stm->type == STATS_COUNTER || stm->type == STATS_GAUGE);
     stm->value.counter++;
 
-    log_debug(LOG_VVVERB, "incr field '%.*s' to %"PRId64"", stm->name.len,
-              stm->name.data, stm->value.counter);
+    log_debug(LOG_VVVERB, "incr field '%.*s' to %"PRId64" %d", stm->name.len,
+              stm->name.data, stm->value.counter,getpid());
 }
 
 void
@@ -1082,8 +1162,10 @@ _stats_pool_incr_by(struct context *ctx, struct server_pool *pool,
     ASSERT(stm->type == STATS_COUNTER || stm->type == STATS_GAUGE);
     stm->value.counter += val;
 
-    log_debug(LOG_VVVERB, "incr by field '%.*s' to %"PRId64"", stm->name.len,
-              stm->name.data, stm->value.counter);
+    log_debug(LOG_VVVERB, "incr field '%.*s' to %"PRId64" %d", stm->name.len,
+              stm->name.data, stm->value.counter,getpid());
+//    log_debug(LOG_VVVERB, "incr by field '%.*s' to %"PRId64"", stm->name.len,
+ //             stm->name.data, stm->value.counter);
 }
 
 void
@@ -1138,8 +1220,11 @@ _stats_server_incr(struct context *ctx, struct server *server,
     ASSERT(stm->type == STATS_COUNTER || stm->type == STATS_GAUGE);
     stm->value.counter++;
 
-    log_debug(LOG_VVVERB, "incr field '%.*s' to %"PRId64"", stm->name.len,
-              stm->name.data, stm->value.counter);
+    log_debug(LOG_VVVERB, "incr field '%.*s' to %"PRId64" %d", stm->name.len,
+              stm->name.data, stm->value.counter,getpid());
+
+//    log_debug(LOG_VVVERB, "incr field '%.*s' to %"PRId64"", stm->name.len,
+//              stm->name.data, stm->value.counter);
 }
 
 void
@@ -1168,8 +1253,10 @@ _stats_server_incr_by(struct context *ctx, struct server *server,
     ASSERT(stm->type == STATS_COUNTER || stm->type == STATS_GAUGE);
     stm->value.counter += val;
 
-    log_debug(LOG_VVVERB, "incr by field '%.*s' to %"PRId64"", stm->name.len,
-              stm->name.data, stm->value.counter);
+    log_debug(LOG_VVVERB, "incr field '%.*s' to %"PRId64" %d", stm->name.len,
+              stm->name.data, stm->value.counter,getpid());
+//    log_debug(LOG_VVVERB, "incr by field '%.*s' to %"PRId64"", stm->name.len,
+ //             stm->name.data, stm->value.counter);
 }
 
 void
