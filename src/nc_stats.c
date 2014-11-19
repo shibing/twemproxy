@@ -610,6 +610,7 @@ stats_copy_metric(struct stats *st, struct array *metric)
     return NC_OK;
 }
 
+
 static void
 stats_aggregate_metric(struct array *dst, struct array *src)
 {
@@ -770,11 +771,47 @@ stats_send_rsp(struct stats *st)
     return NC_OK;
 }
 
+void aggregate_remote_shadow(struct array *shadow,int flag){
+    uint32_t i, j;
+
+    for (i = 0; i < array_n(shadow); i++) {
+        struct stats_pool *stp = array_get(shadow, i);
+
+        for (j = 0; j < array_n(&stp->metric); j++) {
+            struct stats_metric *stm1 = array_get(&stp->metric, j);
+
+            log_error("remote shadow data type=%d name=%.*s flag = %d",stm1->type,stm1->name.len,stm1->name.data,flag);
+
+
+            switch (stm1->type) {
+            case STATS_COUNTER:
+                log_error("remote shadow data type=%d, counter=%d",
+                      stm1->type,stm1->value.counter);
+                break;
+
+            case STATS_GAUGE:
+                log_error("remote shadow data type=%d, counter=%d",
+                      stm1->type,stm1->value.counter);
+                break;
+
+            case STATS_TIMESTAMP:
+                if (stm1->value.timestamp) {
+                    log_error("remote shadow data type=%d, counter=%d",
+                       stm1->type,stm1->value.counter);
+                }
+                break;
+
+            default:
+                NOT_REACHED();
+            }
+        }
+    }
+
+}
 static int receive_message( int fd )
 {
     int ret;
     int i;
-    unsigned char buf[10];
  
     struct msghdr msghdr;
     struct iovec iov[1];
@@ -782,9 +819,13 @@ static int receive_message( int fd )
         struct cmsghdr cm;
         char data[CMSG_SPACE(sizeof(int))];
     } cmsg;
- 
-    iov[0].iov_base = buf;
-    iov[0].iov_len = sizeof(buf);
+
+    //struct array *test_array;
+
+    //struct array shadow;
+    struct stats_pool stp;
+    iov[0].iov_base = &stp;
+    iov[0].iov_len = sizeof(struct stats_pool);
  
     msghdr.msg_name = NULL;
     msghdr.msg_namelen = 0;
@@ -810,9 +851,40 @@ static int receive_message( int fd )
         {
             log_error( "msg control level %d, type %d", cmsg.cm.cmsg_level, cmsg.cm.cmsg_type );
         }
-        char *temp = msghdr.msg_iov[0].iov_base;
-        temp[ret] = '\0';
-        log_error("get message:%s", temp);
+
+        struct stats_metric *stm1 = array_get(&stp.metric, 2);
+
+         switch (stm1->type) {
+            case STATS_COUNTER:
+                log_error("remote shadow data type=%d, counter=%d",
+                      stm1->type,stm1->value.counter);
+                break;
+
+            case STATS_GAUGE:
+                log_error("remote shadow data type=%d, counter=%d",
+                      stm1->type,stm1->value.counter);
+                break;
+
+            case STATS_TIMESTAMP:
+                if (stm1->value.timestamp) {
+                    log_error("remote shadow data type=%d, counter=%d",
+                       stm1->type,stm1->value.counter);
+                }
+                break;
+
+            default:
+                NOT_REACHED();
+            }
+
+
+        //log_error("get message:%d", array_n(&shadow));
+
+        //for (i = 0; i < array_n(&test_array); i++) {
+        //    shadow = array_get(&test_array,i);
+        //    log_error("shadow type=%d,counter:%d", shadow->type,shadow->value.counter);
+        //}
+        
+//        aggregate_remote_shadow(&shadow,1);
  
     //}
  
@@ -868,6 +940,23 @@ stats_loop(void *arg)
 
     return NULL;
 }
+
+
+static void *
+stats_child_loop(void *arg)
+{
+    struct context *ctx = arg;
+    struct stats *st = ctx->stats;
+
+    for (;;) {
+        //TODO send aggregate message here
+        log_error("need send aggregate message here");
+        sleep(1);
+    }
+
+    return NULL;
+}
+
 
 static rstatus_t
 stats_listen(struct stats *st)
@@ -962,6 +1051,24 @@ stats_start_aggregator(struct context *ctx,struct stats *st)
 
     return NC_OK;
 }
+
+
+
+//we need send the stat message from child to master 
+rstatus_t
+stats_start_child_aggregator(struct context *ctx)
+{
+    rstatus_t status;
+
+    status = pthread_create(&ctx->stats->tid, NULL, stats_child_loop, ctx);
+    if (status < 0) {
+        log_error("stats child aggregator create failed: %s", strerror(status));
+        return NC_ERROR;
+    }
+
+    return NC_OK;
+}
+
 
 static void
 stats_stop_aggregator(struct stats *st)
@@ -1219,6 +1326,8 @@ _stats_server_incr(struct context *ctx, struct server *server,
 
     ASSERT(stm->type == STATS_COUNTER || stm->type == STATS_GAUGE);
     stm->value.counter++;
+
+    log_error("stats_server_incr stm type=%d",stm->type);
 
     log_debug(LOG_VVVERB, "incr field '%.*s' to %"PRId64" %d", stm->name.len,
               stm->name.data, stm->value.counter,getpid());

@@ -70,10 +70,13 @@ struct stats_metric {
     } value;
 };
 
+
+
 struct stats_server {
     struct string name;   /* server name (ref) */
     struct array  metric; /* stats_metric[] for server codec */
 };
+
 
 struct stats_pool {
     struct string name;   /* pool name (ref) */
@@ -203,6 +206,8 @@ struct stats *stats_create(struct context *ctx,uint16_t stats_port, char *stats_
 void stats_destroy(struct stats *stats);
 void stats_swap(struct stats *stats);
 void *stats_loop(void *arg);
-
+void aggregate_remote_shadow(struct array *shadow,int flag);
+rstatus_t
+stats_start_child_aggregator(struct context *ctx);
 
 #endif

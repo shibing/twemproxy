@@ -75,6 +75,7 @@ process_loop(struct context *ctx,int process_index)
     //    return NC_ERROR;
     //}
 
+    stats_start_child_aggregator(ctx);
     nc_processes[process_index].pid = getpid();
     nc_current_process_slot = process_index;
     nc_process_init(ctx,&nc_processes[process_index]);
