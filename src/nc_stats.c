@@ -859,14 +859,6 @@ static void stats_send_master(struct context *ctx) {
 //    cmsg.cm.cmsg_type = SCM_RIGHTS;
 //    *(int*)CMSG_DATA(&(cmsg.cm)) = NULL;
 
-    //struct array test_array;
-    //struct stats_metric_test *shadow = array_push(&test_array);
-
-    //shadow->type = 1;
-//    shadow.name=string("test");
-    //shadow->value.counter=200;
-    //struct stats_pool *stp = array_get(&ctx->stats->shadow, 0);
-    //struct stats_metric *stm1 = array_get(&stp->metric, 2);
     struct stats_packet *send_data = nc_alloc(sizeof(struct stats_packet) *1024);
     make_stats_send_master(ctx->stats,send_data);
 
@@ -879,46 +871,11 @@ static void stats_send_master(struct context *ctx) {
     iov[0].iov_len = sizeof(struct stats_packet) * 1024;
     log_error("length = %d",iov[0].iov_len);
 
-        //switch (stm1->type) {
-        //case STATS_COUNTER:
-        //    log_error("0 remote shadow data type=%d, counter=%d name=%.*s",
-        //          stm1->type,stm1->value.counter,stm1->name.len,stm1->name.data);
-        //    break;
-
-        //case STATS_GAUGE:
-        //    log_error("0 remote shadow data type=%d, counter=%d name=%.*s",
-        //          stm1->type,stm1->value.counter,stm1->name.len,stm1->name.data);
-        //    break;
-
-        //case STATS_TIMESTAMP:
-        //    if (stm1->value.timestamp) {
-        //        log_error("0 remote shadow data type=%d, counter=%d",
-        //           stm1->type,stm1->value.counter);
-        //    }
-        //    break;
-
-        //default:
-        //    NOT_REACHED();
-        //}
-
-//    aggregate_remote_shadow(&ctx->stats->shadow,0);     
-
-    
-    //iov[1].iov_base = MSG_DATA;
-    //iov[1].iov_len = MSG_LEN;
-    //iov[2].iov_base = MSG_DATA;
-    //iov[2].iov_len = MSG_LEN;
-    //iov[3].iov_base = MSG_DATA;
-    //iov[3].iov_len = MSG_LEN;
  
     msghdr.msg_name = NULL;
     msghdr.msg_namelen = 0;
     msghdr.msg_iov = iov;
     msghdr.msg_iovlen = 1;
-//    msghdr.msg_control = (caddr_t)&cmsg;
-//    msghdr.msg_controllen = sizeof(cmsg);
- 
-    //log_error( "to send %d pid = %d", MSG_LEN,getpid() );
  
     ret = sendmsg( ctx->channel[1], &msghdr, MSG_DONTWAIT );
     if( ret < 0 )
