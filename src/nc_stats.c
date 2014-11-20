@@ -865,7 +865,7 @@ static void stats_send_master(struct context *ctx) {
     struct msghdr msghdr = {0}; 
     struct iovec iov[1];
 
-//    struct stats_packet *send_data = nc_alloc(sizeof(struct stats_packet) *1024);
+//    struct stats_packet *send_data = nc_alloc(sizeof(struct stats_packet) *128);
     struct stats_packet send_data[128];
     struct array all_stats_data;
     array_init(&all_stats_data,128,sizeof(struct stats_packet));
@@ -889,6 +889,9 @@ static void stats_send_master(struct context *ctx) {
         for(j=0; j<128; ++j){
             send_data[j] = *(struct stats_packet *)array_get(&all_stats_data,i);
             ++i;
+            if(i>=total){
+                break;
+            }
         }
 
         //send end sentinel element
@@ -922,7 +925,7 @@ static void stats_send_master(struct context *ctx) {
 
 static int receive_message( struct context *ctx )
 {
-    int ret;
+    uint32_t ret;
     int i;
     struct stats_packet stats_packet_pool[128];
     uint32_t expect = sizeof(struct stats_packet) * 128; 
@@ -942,9 +945,11 @@ static int receive_message( struct context *ctx )
         {
             log_error( "recvmsg failed" );
         }
+     log_error( "ret=%d expect=%d",ret,expect );
 
     if(ret<expect){
      log_error( "small than expect errno = %d ret=%d",errno,ret );
+     return NC_ERROR;
 //     nc_memcpy(((char *)full_stats_packet_pool) + stats_pos, stats_packet_pool, ret);
 //     stats_pos = ret;
 //     
@@ -961,7 +966,7 @@ static int receive_message( struct context *ctx )
     for(i=0; i<128; ++i){
         struct stats_packet sp = stats_packet_pool[i]; 
 
-            log_error("get stats_packet type=%d, pidx=%d,fidx=%d,plus_counter=%d,minous_counter=%d",sp.type,sp.pidx,sp.fidx,sp.plus_counter,sp.minus_counter);
+//            log_error("get stats_packet type=%d, pidx=%d,fidx=%d,plus_counter=%d,minous_counter=%d",sp.type,sp.pidx,sp.fidx,sp.plus_counter,sp.minus_counter);
         if(sp.type==2){
             break;
         }
@@ -1060,7 +1065,7 @@ stats_child_loop(void *arg)
         /* send aggregate stats sum (c) to master */
         stats_send_master(ctx);
 
-        sleep(5);
+        sleep(1);
     }
 
     return NULL;
