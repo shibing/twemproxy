@@ -77,6 +77,14 @@ struct stats_server {
     struct array  metric; /* stats_metric[] for server codec */
 };
 
+struct stats_packet {
+    uint8_t type:2;
+    uint8_t pidx;
+    uint8_t sidx;
+    uint8_t fidx;
+    struct stats_metric metric; 
+};
+
 
 struct stats_pool {
     struct string name;   /* pool name (ref) */

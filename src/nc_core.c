@@ -361,90 +361,6 @@ core_core(struct context *ctx, struct conn *conn, uint32_t events)
     }
 }
 
-#define MSG_DATA "xyz"
-#define MSG_LEN sizeof(MSG_DATA)
-
-void send_message(int fd,struct context *ctx) {
-    int ret;
-    int i;
- 
-    struct msghdr msghdr;
-    struct iovec iov[1];
-    union {
-        struct cmsghdr cm;
-        char data[CMSG_SPACE(sizeof(int))];
-    } cmsg;
- 
- 
-    cmsg.cm.cmsg_len = CMSG_LEN(sizeof(int));
-    cmsg.cm.cmsg_level = SOL_SOCKET;
-    cmsg.cm.cmsg_type = SCM_RIGHTS;
-    *(int*)CMSG_DATA(&(cmsg.cm)) = NULL;
-
-    //struct array test_array;
-    //struct stats_metric_test *shadow = array_push(&test_array);
-
-    //shadow->type = 1;
-//    shadow.name=string("test");
-    //shadow->value.counter=200;
-    struct stats_pool *stp = array_get(&ctx->stats->shadow, 0);
-    struct stats_metric *stm1 = array_get(&stp->metric, 2);
- 
-
-    iov[0].iov_base = (char *) stp;
-    iov[0].iov_len = sizeof(struct stats_pool);
-    log_error("length = %d",iov[0].iov_len);
-
-        switch (stm1->type) {
-        case STATS_COUNTER:
-            log_error("0 remote shadow data type=%d, counter=%d name=%.*s",
-                  stm1->type,stm1->value.counter,stm1->name.len,stm1->name.data);
-            break;
-
-        case STATS_GAUGE:
-            log_error("0 remote shadow data type=%d, counter=%d name=%.*s",
-                  stm1->type,stm1->value.counter,stm1->name.len,stm1->name.data);
-            break;
-
-        case STATS_TIMESTAMP:
-            if (stm1->value.timestamp) {
-                log_error("0 remote shadow data type=%d, counter=%d",
-                   stm1->type,stm1->value.counter);
-            }
-            break;
-
-        default:
-            NOT_REACHED();
-        }
-
-//    aggregate_remote_shadow(&ctx->stats->shadow,0);     
-
-    
-    //iov[1].iov_base = MSG_DATA;
-    //iov[1].iov_len = MSG_LEN;
-    //iov[2].iov_base = MSG_DATA;
-    //iov[2].iov_len = MSG_LEN;
-    //iov[3].iov_base = MSG_DATA;
-    //iov[3].iov_len = MSG_LEN;
- 
-    msghdr.msg_name = NULL;
-    msghdr.msg_namelen = 0;
-    msghdr.msg_iov = iov;
-    msghdr.msg_iovlen = 1;
-    msghdr.msg_control = (caddr_t)&cmsg;
-    msghdr.msg_controllen = sizeof(cmsg);
- 
-    log_error( "to send %d pid = %d", MSG_LEN,getpid() );
- 
-    ret = sendmsg( fd, &msghdr, MSG_DONTWAIT );
-    if( ret < 0 )
-    {
-        log_error( "sendmsg failed" );
-    }
- 
- 
-    return 0;
-}
 
 rstatus_t
 core_loop(struct context *ctx)
@@ -466,9 +382,5 @@ core_loop(struct context *ctx)
 
     stats_swap(ctx->stats);
 
-   
-    //TODO just send msg here for test
-    send_message(ctx->channel[1],ctx);
- 
     return NC_OK;
 }

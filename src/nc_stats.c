@@ -52,6 +52,13 @@ static struct stats_desc stats_server_desc[] = {
 };
 #undef DEFINE_ACTION
 
+static void
+_master_stats_server_set_by(struct context *ctx, struct stats_server *sts, stats_server_field_t fidx, int64_t val);
+static void
+_master_stats_pool_set_by(struct context *ctx, struct stats_pool *pool,
+                    stats_pool_field_t fidx, int64_t val);
+
+
 void
 stats_describe(void)
 {
@@ -669,7 +676,7 @@ stats_aggregate(struct stats *st)
 
         for (j = 0; j < array_n(&stp1->server); j++) {
             struct stats_server *sts1, *sts2;
-
+//
             sts1 = array_get(&stp1->server, j);
             sts2 = array_get(&stp2->server, j);
             stats_aggregate_metric(&sts2->metric, &sts1->metric);
@@ -771,6 +778,161 @@ stats_send_rsp(struct stats *st)
     return NC_OK;
 }
 
+
+static void 
+make_stats_send_master(struct stats *st,struct stats_packet *st_packet_pool)
+{
+    uint32_t i,j,k;
+
+    array_init((void *)st_packet_pool, (uint32_t)128, sizeof(struct stats_packet));
+
+    //TODO init array 
+    int total = 0; 
+    for (i = 0; i < array_n(&st->sum); i++) {
+        struct stats_pool *stp = array_get(&st->sum, i);
+
+        for (j = 0; j < array_n(&stp->metric); j++) {
+            struct stats_metric *stm = array_get(&stp->metric, j);
+            struct stats_packet  sp;
+            sp.type = 0;
+            sp.pidx = i;
+            sp.fidx = j;
+            nc_memcpy(&sp.metric,stm,sizeof(struct stats_metric));
+            if((total+1)>=1024){
+                goto endfor;
+            }
+            st_packet_pool[total++] = sp;
+
+        }
+
+        if((total+1)>=1024){
+            goto endfor;
+        }
+
+        for (j = 0; j < array_n(&stp->server); j++) {
+            struct stats_server *sts = array_get(&stp->server, j);
+
+            for (k = 0; k < array_n(&sts->metric); k++) {
+                struct stats_metric *stm = array_get(&sts->metric, k);
+                struct stats_packet sp;
+                sp.type = 1;
+                sp.pidx = i;
+                sp.sidx = j;
+                sp.fidx = k;
+                nc_memcpy(&sp.metric,stm,sizeof(struct stats_metric));
+                if((total+1)>=1024){
+                    goto endfor;
+                }
+
+                st_packet_pool[total++] = sp;
+
+            }
+
+        }
+
+    }
+
+endfor:
+    {
+        struct stats_packet sp;
+        sp.type = 2;
+        st_packet_pool[total++] = sp;
+        log_error("total=======%d",total);   
+    }
+}
+
+static void stats_send_master(struct context *ctx) {
+
+    
+    int ret;
+ 
+    struct msghdr msghdr;
+    struct iovec iov[1];
+//    union {
+//        struct cmsghdr cm;
+//        char data[CMSG_SPACE(sizeof(int))];
+//    } cmsg;
+// 
+// 
+//    cmsg.cm.cmsg_len = CMSG_LEN(sizeof(int));
+//    cmsg.cm.cmsg_level = SOL_SOCKET;
+//    cmsg.cm.cmsg_type = SCM_RIGHTS;
+//    *(int*)CMSG_DATA(&(cmsg.cm)) = NULL;
+
+    //struct array test_array;
+    //struct stats_metric_test *shadow = array_push(&test_array);
+
+    //shadow->type = 1;
+//    shadow.name=string("test");
+    //shadow->value.counter=200;
+    //struct stats_pool *stp = array_get(&ctx->stats->shadow, 0);
+    //struct stats_metric *stm1 = array_get(&stp->metric, 2);
+    struct stats_packet *send_data = nc_alloc(sizeof(struct stats_packet) *1024);
+    make_stats_send_master(ctx->stats,send_data);
+
+    int i=0;
+    for (i=0;i<10;++i){
+        log_error("send_data %d,%.*s",send_data[i].type,send_data[i].metric.name.len,send_data[i].metric.name.data);
+    }
+
+    iov[0].iov_base = (char *) send_data;
+    iov[0].iov_len = sizeof(struct stats_packet) * 1024;
+    log_error("length = %d",iov[0].iov_len);
+
+        //switch (stm1->type) {
+        //case STATS_COUNTER:
+        //    log_error("0 remote shadow data type=%d, counter=%d name=%.*s",
+        //          stm1->type,stm1->value.counter,stm1->name.len,stm1->name.data);
+        //    break;
+
+        //case STATS_GAUGE:
+        //    log_error("0 remote shadow data type=%d, counter=%d name=%.*s",
+        //          stm1->type,stm1->value.counter,stm1->name.len,stm1->name.data);
+        //    break;
+
+        //case STATS_TIMESTAMP:
+        //    if (stm1->value.timestamp) {
+        //        log_error("0 remote shadow data type=%d, counter=%d",
+        //           stm1->type,stm1->value.counter);
+        //    }
+        //    break;
+
+        //default:
+        //    NOT_REACHED();
+        //}
+
+//    aggregate_remote_shadow(&ctx->stats->shadow,0);     
+
+    
+    //iov[1].iov_base = MSG_DATA;
+    //iov[1].iov_len = MSG_LEN;
+    //iov[2].iov_base = MSG_DATA;
+    //iov[2].iov_len = MSG_LEN;
+    //iov[3].iov_base = MSG_DATA;
+    //iov[3].iov_len = MSG_LEN;
+ 
+    msghdr.msg_name = NULL;
+    msghdr.msg_namelen = 0;
+    msghdr.msg_iov = iov;
+    msghdr.msg_iovlen = 1;
+//    msghdr.msg_control = (caddr_t)&cmsg;
+//    msghdr.msg_controllen = sizeof(cmsg);
+ 
+    //log_error( "to send %d pid = %d", MSG_LEN,getpid() );
+ 
+    ret = sendmsg( ctx->channel[1], &msghdr, MSG_DONTWAIT );
+    if( ret < 0 )
+    {
+        log_error( "sendmsg failed" );
+    }
+
+    nc_free(send_data);
+ 
+ 
+}
+
+
+
 void aggregate_remote_shadow(struct array *shadow,int flag){
     uint32_t i, j;
 
@@ -808,86 +970,73 @@ void aggregate_remote_shadow(struct array *shadow,int flag){
     }
 
 }
-static int receive_message( int fd )
+static int receive_message( struct context *ctx )
 {
     int ret;
     int i;
  
     struct msghdr msghdr;
     struct iovec iov[1];
-    union {
-        struct cmsghdr cm;
-        char data[CMSG_SPACE(sizeof(int))];
-    } cmsg;
+//    union {
+//        struct cmsghdr cm;
+//        char data[CMSG_SPACE(sizeof(int))];
+//    } cmsg;
 
     //struct array *test_array;
 
     //struct array shadow;
-    struct stats_pool stp;
-    iov[0].iov_base = &stp;
-    iov[0].iov_len = sizeof(struct stats_pool);
+    //struct stats_pool stp;
+    struct stats_packet stats_packet_pool[1024];
+    iov[0].iov_base = stats_packet_pool;
+    iov[0].iov_len =  sizeof(struct stats_packet) * 1024;
+
  
     msghdr.msg_name = NULL;
     msghdr.msg_namelen = 0;
     msghdr.msg_iov = iov;
     msghdr.msg_iovlen = 1;
-    msghdr.msg_control = (caddr_t)&cmsg;
-    msghdr.msg_controllen = sizeof(cmsg);
- 
- 
-    //for( i=0; i<4; i++ )
-    //{
-        ret = recvmsg( fd, &msghdr, 0 );
+
+        ret = recvmsg( ctx->channel[0], &msghdr, 0 );
         if( ret < 0 )
         {
             log_error( "recvmsg failed" );
         }
- 
-        if( cmsg.cm.cmsg_len < CMSG_LEN(sizeof(int)) )
-        {
-            log_error( "msg control data len %u", cmsg.cm.cmsg_len );
+
+
+    struct stats *st = ctx->stats;
+    for(i=0; i<1024; ++i){
+        struct stats_packet sp = stats_packet_pool[i]; 
+        if(sp.type==2){
+            break;
         }
-        if( cmsg.cm.cmsg_level != SOL_SOCKET || cmsg.cm.cmsg_type != SCM_RIGHTS )
-        {
-            log_error( "msg control level %d, type %d", cmsg.cm.cmsg_level, cmsg.cm.cmsg_type );
-        }
-
-        struct stats_metric *stm1 = array_get(&stp.metric, 2);
-
-         switch (stm1->type) {
-            case STATS_COUNTER:
-                log_error("remote shadow data type=%d, counter=%d",
-                      stm1->type,stm1->value.counter);
-                break;
-
-            case STATS_GAUGE:
-                log_error("remote shadow data type=%d, counter=%d",
-                      stm1->type,stm1->value.counter);
-                break;
-
-            case STATS_TIMESTAMP:
-                if (stm1->value.timestamp) {
-                    log_error("remote shadow data type=%d, counter=%d",
-                       stm1->type,stm1->value.counter);
-                }
-                break;
-
-            default:
-                NOT_REACHED();
-            }
-
-
-        //log_error("get message:%d", array_n(&shadow));
-
-        //for (i = 0; i < array_n(&test_array); i++) {
-        //    shadow = array_get(&test_array,i);
-        //    log_error("shadow type=%d,counter:%d", shadow->type,shadow->value.counter);
-        //}
+        //log_error("get stats_packet name = %.*s type=%d, pidx=%d,fidx=%d",sp.metric.name.len,sp.metric.name.data,sp.type,sp.pidx,sp.fidx);
+        //TODO set the data to the mater process data
         
-//        aggregate_remote_shadow(&shadow,1);
- 
-    //}
- 
+        if(sp.type==0){
+           switch(sp.metric.type) {
+           case STATS_COUNTER:
+           case STATS_GAUGE:
+                log_error("get stats_packet name = %.*s type=%d, pidx=%d,fidx=%d, counter=%d",sp.metric.name.len,sp.metric.name.data,sp.type,sp.pidx,sp.fidx,sp.metric.value.counter);
+                _master_stats_pool_set_by(ctx,array_get(&st->sum,sp.pidx),sp.fidx,sp.metric.value.counter);
+           default:
+                NOT_REACHED();
+           }
+        } 
+
+        if(sp.type==1){
+           struct stats_pool *stp = array_get(&st->sum, sp.pidx);
+           switch(sp.metric.type) {
+           case STATS_COUNTER:
+           case STATS_GAUGE:
+                log_error("get stats_packet name = %.*s type=%d, pidx=%d,fidx=%d, counter=%d",sp.metric.name.len,sp.metric.name.data,sp.type,sp.pidx,sp.fidx,sp.metric.value.counter);
+                _master_stats_server_set_by(ctx,array_get(&stp->server,sp.sidx),sp.fidx,sp.metric.value.counter);
+           default:
+                NOT_REACHED();
+           }
+        } 
+    }
+//    msghdr.msg_control = (caddr_t)&cmsg;
+//    msghdr.msg_controllen = sizeof(cmsg);
     return 0;
 }
 
@@ -900,7 +1049,7 @@ stats_loop(void *arg)
     int i;
 
     for (;;) {
-        struct epoll_event events[1023];
+        struct epoll_event events[1024];
         n = epoll_wait(st->ep, events, 1024, st->interval);
         if (n < 0) {
             if (errno == EINTR) {
@@ -916,6 +1065,7 @@ stats_loop(void *arg)
                 //stats thread socket listening comming in
                 /* aggregate stats from shadow (b) -> sum (c) */
                 st->event = events[i];
+                //stats_swap(st);
                 stats_aggregate(st);
                 if (n == 0) {
                     continue;
@@ -925,12 +1075,12 @@ stats_loop(void *arg)
                 stats_send_rsp(st);
 
             } else if( events[i].data.fd == ctx->channel[0] && events[i].events&EPOLLIN ){
-                receive_message(ctx->channel[0]);        
+                receive_message(ctx);        
                 log_error("channel 0 come in"); 
         
             }
 
-            log_error("event coming in %p",events[i].data.fd);
+            //log_error("event coming in %p",events[i].data.fd);
 
             
 
@@ -946,12 +1096,17 @@ static void *
 stats_child_loop(void *arg)
 {
     struct context *ctx = arg;
-    struct stats *st = ctx->stats;
 
     for (;;) {
         //TODO send aggregate message here
         log_error("need send aggregate message here");
-        sleep(1);
+        
+        //stats_swap(ctx->stats);
+        stats_aggregate(ctx->stats);
+        /* send aggregate stats sum (c) to master */
+        stats_send_master(ctx);
+
+        sleep(5);
     }
 
     return NULL;
@@ -1239,8 +1394,8 @@ _stats_pool_incr(struct context *ctx, struct server_pool *pool,
     ASSERT(stm->type == STATS_COUNTER || stm->type == STATS_GAUGE);
     stm->value.counter++;
 
-    log_debug(LOG_VVVERB, "incr field '%.*s' to %"PRId64" %d", stm->name.len,
-              stm->name.data, stm->value.counter,getpid());
+    log_debug(LOG_VVVERB, "incr field '%.*s' to %"PRId64"", stm->name.len,
+              stm->name.data, stm->value.counter);
 }
 
 void
@@ -1269,10 +1424,8 @@ _stats_pool_incr_by(struct context *ctx, struct server_pool *pool,
     ASSERT(stm->type == STATS_COUNTER || stm->type == STATS_GAUGE);
     stm->value.counter += val;
 
-    log_debug(LOG_VVVERB, "incr field '%.*s' to %"PRId64" %d", stm->name.len,
-              stm->name.data, stm->value.counter,getpid());
-//    log_debug(LOG_VVVERB, "incr by field '%.*s' to %"PRId64"", stm->name.len,
- //             stm->name.data, stm->value.counter);
+    log_debug(LOG_VVVERB, "incr by field '%.*s' to %"PRId64"", stm->name.len,
+              stm->name.data, stm->value.counter);
 }
 
 void
@@ -1289,6 +1442,9 @@ _stats_pool_decr_by(struct context *ctx, struct server_pool *pool,
     log_debug(LOG_VVVERB, "decr by field '%.*s' to %"PRId64"", stm->name.len,
               stm->name.data, stm->value.counter);
 }
+
+
+
 
 static struct stats_metric *
 stats_server_to_metric(struct context *ctx, struct server *server,
@@ -1382,3 +1538,98 @@ _stats_server_decr_by(struct context *ctx, struct server *server,
     log_debug(LOG_VVVERB, "decr by field '%.*s' to %"PRId64"", stm->name.len,
               stm->name.data, stm->value.counter);
 }
+
+
+
+
+//master stats 
+static struct stats_metric *
+master_stats_server_to_metric(struct context *ctx, struct stats_server *sts,
+                       stats_server_field_t fidx)
+{
+    struct stats *st;
+    //struct stats_pool *stp;
+    //struct stats_server *sts;
+    struct stats_metric *stm;
+    uint32_t pidx, sidx;
+
+    //sidx = server->idx;
+    //pidx = server->owner->idx;
+
+    st = ctx->stats;
+    //stp = array_get(&st->current, pidx);
+    //sts = array_get(&stp->server, sidx);
+    stm = array_get(&sts->metric, fidx);
+
+    st->updated = 1;
+
+    log_debug(LOG_VVVERB, "metric '%.*s' in pool %"PRIu32" server %"PRIu32"",
+              stm->name.len, stm->name.data, pidx, sidx);
+
+    return stm;
+}
+
+
+
+static void
+_master_stats_server_set_by(struct context *ctx, struct stats_server *sts,
+                      stats_server_field_t fidx, int64_t val)
+{
+    struct stats_metric *stm;
+
+    stm = master_stats_server_to_metric(ctx, sts, fidx);
+
+    ASSERT(stm->type == STATS_COUNTER || stm->type == STATS_GAUGE);
+    stm->value.counter = val;
+
+    log_debug(LOG_VVVERB, "incr field '%.*s' to %"PRId64" %d", stm->name.len,
+              stm->name.data, stm->value.counter,getpid());
+//    log_debug(LOG_VVVERB, "incr by field '%.*s' to %"PRId64"", stm->name.len,
+ //             stm->name.data, stm->value.counter);
+}
+
+
+static struct stats_metric *
+master_stats_pool_to_metric(struct context *ctx, struct stats_pool *pool,
+                     stats_pool_field_t fidx)
+{
+    struct stats *st;
+    //struct stats_pool *stp;
+    struct stats_metric *stm;
+//    uint32_t pidx;
+
+    //pidx = pool->idx;
+
+    st = ctx->stats;
+//    stp = array_get(&st->current, pidx);
+    stm = array_get(&pool->metric, fidx);
+
+    st->updated = 1;
+
+    log_debug(LOG_VVVERB, "metric '%.*s' in pool %"PRIu32"", stm->name.len,
+              stm->name.data, pool);
+
+    return stm;
+}
+
+
+
+static void
+_master_stats_pool_set_by(struct context *ctx, struct stats_pool *pool,
+                    stats_pool_field_t fidx, int64_t val)
+{
+    struct stats_metric *stm;
+
+    stm = master_stats_pool_to_metric(ctx, pool, fidx);
+
+    ASSERT(stm->type == STATS_COUNTER || stm->type == STATS_GAUGE);
+    stm->value.counter = val;
+
+    log_debug(LOG_VVVERB, "incr field '%.*s' to %"PRId64" %d", stm->name.len,
+              stm->name.data, stm->value.counter,getpid());
+//    log_debug(LOG_VVVERB, "incr by field '%.*s' to %"PRId64"", stm->name.len,
+ //             stm->name.data, stm->value.counter);
+}
+
+
+
