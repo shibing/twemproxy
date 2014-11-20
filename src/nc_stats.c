@@ -866,7 +866,7 @@ static void stats_send_master(struct context *ctx) {
     struct iovec iov[1];
 
 //    struct stats_packet *send_data = nc_alloc(sizeof(struct stats_packet) *1024);
-    struct stats_packet send_data[2];
+    struct stats_packet send_data[128];
     struct array all_stats_data;
     array_init(&all_stats_data,128,sizeof(struct stats_packet));
     uint32_t total = make_stats_send_master(ctx->stats,send_data,&all_stats_data);
@@ -895,7 +895,7 @@ static void stats_send_master(struct context *ctx) {
         send_data[j].type = 2;
 
         iov[0].iov_base = (char *) send_data;
-        iov[0].iov_len = sizeof(struct stats_packet) * 2;
+        iov[0].iov_len = sizeof(struct stats_packet) * 128;
         log_error("length = %d",iov[0].iov_len);
     
      
@@ -924,8 +924,8 @@ static int receive_message( struct context *ctx )
 {
     int ret;
     int i;
-    struct stats_packet stats_packet_pool[2];
-    uint32_t expect = sizeof(struct stats_packet) * 2; 
+    struct stats_packet stats_packet_pool[128];
+    uint32_t expect = sizeof(struct stats_packet) * 128; 
     struct msghdr msghdr = {0};
     struct iovec iov[1];
     iov[0].iov_base = stats_packet_pool;
@@ -958,7 +958,7 @@ static int receive_message( struct context *ctx )
    // stats_pos = 0;
 
     struct stats *st = ctx->stats;
-    for(i=0; i<2; ++i){
+    for(i=0; i<128; ++i){
         struct stats_packet sp = stats_packet_pool[i]; 
 
             log_error("get stats_packet type=%d, pidx=%d,fidx=%d,plus_counter=%d,minous_counter=%d",sp.type,sp.pidx,sp.fidx,sp.plus_counter,sp.minus_counter);
