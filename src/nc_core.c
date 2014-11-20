@@ -138,7 +138,7 @@ core_ctx_create(struct instance *nci)
     pid_t pid; 
     int i = 0;
     //TODO need change 8 to MARCRO
-    for(i =0; i< 7; ++i){
+    for(i =0; i< 8; ++i){
        pid = fork();
        switch (pid) {
        case -1:

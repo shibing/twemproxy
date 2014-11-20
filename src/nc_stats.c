@@ -886,7 +886,7 @@ static void stats_send_master(struct context *ctx) {
     int i = 0;
     while(i<total){
         int j = 0;
-        for(j=0; j<1; ++j){
+        for(j=0; j<128; ++j){
             send_data[j] = *(struct stats_packet *)array_get(&all_stats_data,i);
             ++i;
         }
