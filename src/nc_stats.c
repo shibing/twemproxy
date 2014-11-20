@@ -640,10 +640,14 @@ stats_aggregate_metric(struct array *dst, struct array *src)
         switch (stm1->type) {
         case STATS_COUNTER:
             stm2->value.counter += stm1->value.counter;
+            stm2->plus_counter += stm1->plus_counter;
+            stm2->minus_counter += stm1->minus_counter;
             break;
 
         case STATS_GAUGE:
             stm2->value.counter += stm1->value.counter;
+            stm2->plus_counter += stm1->plus_counter;
+            stm2->minus_counter += stm1->minus_counter;
             break;
 
         case STATS_TIMESTAMP:
@@ -894,17 +898,8 @@ static int receive_message( struct context *ctx )
     int ret;
     int i;
  
-    struct msghdr msghdr;
+    struct msghdr msghdr = {0};
     struct iovec iov[1];
-//    union {
-//        struct cmsghdr cm;
-//        char data[CMSG_SPACE(sizeof(int))];
-//    } cmsg;
-
-    //struct array *test_array;
-
-    //struct array shadow;
-    //struct stats_pool stp;
     struct stats_packet stats_packet_pool[1024];
     iov[0].iov_base = stats_packet_pool;
     iov[0].iov_len =  sizeof(struct stats_packet) * 1024;
@@ -928,7 +923,7 @@ static int receive_message( struct context *ctx )
         if(sp.type==2){
             break;
         }
-        //log_error("get stats_packet name = %.*s type=%d, pidx=%d,fidx=%d",sp.metric.name.len,sp.metric.name.data,sp.type,sp.pidx,sp.fidx);
+        log_error("get stats_packet name = %.*s type=%d, pidx=%d,fidx=%d,plus_counter=%d,minous_counter=%d",sp.metric.name.len,sp.metric.name.data,sp.type,sp.pidx,sp.fidx,sp.metric.plus_counter,sp.metric.minus_counter);
         //TODO set the data to the mater process data
         
         if(sp.type==0){
@@ -947,7 +942,7 @@ static int receive_message( struct context *ctx )
            switch(sp.metric.type) {
            case STATS_COUNTER:
            case STATS_GAUGE:
-                //log_error("get stats_packet name = %.*s type=%d, pidx=%d,fidx=%d, counter=%d",sp.metric.name.len,sp.metric.name.data,sp.type,sp.pidx,sp.fidx,sp.metric.value.counter);
+                log_error("get stats_packet name = %.*s type=%d, pidx=%d,fidx=%d, counter=%d",sp.metric.name.len,sp.metric.name.data,sp.type,sp.pidx,sp.fidx,sp.metric.value.counter);
                 _master_stats_server_set_by(ctx,array_get(&stp->server,sp.sidx),sp.fidx,&sp.metric);
            default:
                 NOT_REACHED();
@@ -1024,7 +1019,7 @@ stats_child_loop(void *arg)
         /* send aggregate stats sum (c) to master */
         stats_send_master(ctx);
 
-        sleep(1);
+        sleep(5);
     }
 
     return NULL;
@@ -1549,11 +1544,11 @@ _master_stats_pool_set_by(struct context *ctx, struct stats_pool *pool,
     stm = master_stats_pool_to_metric(ctx, pool, fidx);
 
     ASSERT(stm->type == STATS_COUNTER || stm->type == STATS_GAUGE);
+    log_debug(LOG_VVVERB, "incr field '%.*s' to %"PRId64" %d", stm->name.len,
+              stm->name.data, stm->value.counter,getpid());
     stm->value.counter += src_stm->plus_counter;
     stm->value.counter += src_stm->minus_counter;
 
-    log_debug(LOG_VVVERB, "incr field '%.*s' to %"PRId64" %d", stm->name.len,
-              stm->name.data, stm->value.counter,getpid());
 //    log_debug(LOG_VVVERB, "incr by field '%.*s' to %"PRId64"", stm->name.len,
  //             stm->name.data, stm->value.counter);
 }
