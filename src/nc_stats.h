@@ -68,6 +68,9 @@ struct stats_metric {
         int64_t   counter;      /* accumulating counter */
         int64_t   timestamp;    /* monotonic timestamp */
     } value;
+
+    int64_t   plus_counter;      /* accumulating counter */
+    int64_t   minus_counter;      /* accumulating counter */
 };
 
 

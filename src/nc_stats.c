@@ -53,10 +53,10 @@ static struct stats_desc stats_server_desc[] = {
 #undef DEFINE_ACTION
 
 static void
-_master_stats_server_set_by(struct context *ctx, struct stats_server *sts, stats_server_field_t fidx, int64_t val);
+_master_stats_server_set_by(struct context *ctx, struct stats_server *sts, stats_server_field_t fidx, struct stats_metric *stm);
 static void
 _master_stats_pool_set_by(struct context *ctx, struct stats_pool *pool,
-                    stats_pool_field_t fidx, int64_t val);
+                    stats_pool_field_t fidx, struct stats_metric *stm);
 
 
 void
@@ -82,6 +82,10 @@ stats_describe(void)
 static void
 stats_metric_init(struct stats_metric *stm)
 {
+
+    stm->plus_counter = 0LL;
+    stm->minus_counter = 0LL;
+
     switch (stm->type) {
     case STATS_COUNTER:
         stm->value.counter = 0LL;
@@ -98,6 +102,8 @@ stats_metric_init(struct stats_metric *stm)
     default:
         NOT_REACHED();
     }
+
+
 }
 
 static void
@@ -930,7 +936,7 @@ static int receive_message( struct context *ctx )
            case STATS_COUNTER:
            case STATS_GAUGE:
                 //log_error("get stats_packet name = %.*s type=%d, pidx=%d,fidx=%d, counter=%d",sp.metric.name.len,sp.metric.name.data,sp.type,sp.pidx,sp.fidx,sp.metric.value.counter);
-                _master_stats_pool_set_by(ctx,array_get(&st->sum,sp.pidx),sp.fidx,sp.metric.value.counter);
+                _master_stats_pool_set_by(ctx,array_get(&st->sum,sp.pidx),sp.fidx,&sp.metric);
            default:
                 NOT_REACHED();
            }
@@ -942,7 +948,7 @@ static int receive_message( struct context *ctx )
            case STATS_COUNTER:
            case STATS_GAUGE:
                 //log_error("get stats_packet name = %.*s type=%d, pidx=%d,fidx=%d, counter=%d",sp.metric.name.len,sp.metric.name.data,sp.type,sp.pidx,sp.fidx,sp.metric.value.counter);
-                _master_stats_server_set_by(ctx,array_get(&stp->server,sp.sidx),sp.fidx,sp.metric.value.counter);
+                _master_stats_server_set_by(ctx,array_get(&stp->server,sp.sidx),sp.fidx,&sp.metric);
            default:
                 NOT_REACHED();
            }
@@ -1304,6 +1310,7 @@ _stats_pool_incr(struct context *ctx, struct server_pool *pool,
 
     ASSERT(stm->type == STATS_COUNTER || stm->type == STATS_GAUGE);
     stm->value.counter++;
+    stm->plus_counter++;
 
     log_debug(LOG_VVVERB, "incr field '%.*s' to %"PRId64"", stm->name.len,
               stm->name.data, stm->value.counter);
@@ -1319,6 +1326,7 @@ _stats_pool_decr(struct context *ctx, struct server_pool *pool,
 
     ASSERT(stm->type == STATS_GAUGE);
     stm->value.counter--;
+    stm->minus_counter--;
 
     log_debug(LOG_VVVERB, "decr field '%.*s' to %"PRId64"", stm->name.len,
               stm->name.data, stm->value.counter);
@@ -1334,6 +1342,7 @@ _stats_pool_incr_by(struct context *ctx, struct server_pool *pool,
 
     ASSERT(stm->type == STATS_COUNTER || stm->type == STATS_GAUGE);
     stm->value.counter += val;
+    stm->plus_counter += val;
 
     log_debug(LOG_VVVERB, "incr by field '%.*s' to %"PRId64"", stm->name.len,
               stm->name.data, stm->value.counter);
@@ -1349,6 +1358,7 @@ _stats_pool_decr_by(struct context *ctx, struct server_pool *pool,
 
     ASSERT(stm->type == STATS_GAUGE);
     stm->value.counter -= val;
+    stm->minus_counter -= val;
 
     log_debug(LOG_VVVERB, "decr by field '%.*s' to %"PRId64"", stm->name.len,
               stm->name.data, stm->value.counter);
@@ -1393,6 +1403,7 @@ _stats_server_incr(struct context *ctx, struct server *server,
 
     ASSERT(stm->type == STATS_COUNTER || stm->type == STATS_GAUGE);
     stm->value.counter++;
+    stm->plus_counter++;
 
     log_error("stats_server_incr stm type=%d",stm->type);
 
@@ -1413,6 +1424,7 @@ _stats_server_decr(struct context *ctx, struct server *server,
 
     ASSERT(stm->type == STATS_GAUGE);
     stm->value.counter--;
+    stm->minus_counter--;
 
     log_debug(LOG_VVVERB, "decr field '%.*s' to %"PRId64"", stm->name.len,
               stm->name.data, stm->value.counter);
@@ -1428,6 +1440,7 @@ _stats_server_incr_by(struct context *ctx, struct server *server,
 
     ASSERT(stm->type == STATS_COUNTER || stm->type == STATS_GAUGE);
     stm->value.counter += val;
+    stm->plus_counter += val;
 
     log_debug(LOG_VVVERB, "incr field '%.*s' to %"PRId64" %d", stm->name.len,
               stm->name.data, stm->value.counter,getpid());
@@ -1445,6 +1458,7 @@ _stats_server_decr_by(struct context *ctx, struct server *server,
 
     ASSERT(stm->type == STATS_GAUGE);
     stm->value.counter -= val;
+    stm->minus_counter -= val;
 
     log_debug(LOG_VVVERB, "decr by field '%.*s' to %"PRId64"", stm->name.len,
               stm->name.data, stm->value.counter);
@@ -1484,14 +1498,15 @@ master_stats_server_to_metric(struct context *ctx, struct stats_server *sts,
 
 static void
 _master_stats_server_set_by(struct context *ctx, struct stats_server *sts,
-                      stats_server_field_t fidx, int64_t val)
+                      stats_server_field_t fidx, struct stats_metric *src_stm)
 {
     struct stats_metric *stm;
 
     stm = master_stats_server_to_metric(ctx, sts, fidx);
 
     ASSERT(stm->type == STATS_COUNTER || stm->type == STATS_GAUGE);
-    stm->value.counter = val;
+    stm->value.counter += src_stm->plus_counter;
+    stm->value.counter += src_stm->minus_counter;
 
     log_debug(LOG_VVVERB, "incr field '%.*s' to %"PRId64" %d", stm->name.len,
               stm->name.data, stm->value.counter,getpid());
@@ -1527,14 +1542,15 @@ master_stats_pool_to_metric(struct context *ctx, struct stats_pool *pool,
 
 static void
 _master_stats_pool_set_by(struct context *ctx, struct stats_pool *pool,
-                    stats_pool_field_t fidx, int64_t val)
+                    stats_pool_field_t fidx, struct stats_metric *src_stm)
 {
     struct stats_metric *stm;
 
     stm = master_stats_pool_to_metric(ctx, pool, fidx);
 
     ASSERT(stm->type == STATS_COUNTER || stm->type == STATS_GAUGE);
-    stm->value.counter = val;
+    stm->value.counter += src_stm->plus_counter;
+    stm->value.counter += src_stm->minus_counter;
 
     log_debug(LOG_VVVERB, "incr field '%.*s' to %"PRId64" %d", stm->name.len,
               stm->name.data, stm->value.counter,getpid());
