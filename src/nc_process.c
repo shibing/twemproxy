@@ -41,6 +41,7 @@ static void nc_process_init(struct context *ctx,nc_process_t *process){
     int status, ep;
     struct epoll_event *event;
 
+
     ep = epoll_create(EVENT_SIZE_HINT);
     if (ep < 0) {
         log_error("epoll create of size %d failed: %s", EVENT_SIZE_HINT, strerror(errno));

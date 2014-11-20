@@ -790,7 +790,7 @@ stats_send_rsp(struct stats *st)
 
 
 static uint32_t
-make_stats_send_master(struct stats *st,struct stats_packet *st_packet_pool)
+make_stats_send_master(struct stats *st,struct stats_packet *st_packet_pool,struct array *st_packet_array)
 {
     uint32_t i,j,k;
 
@@ -802,45 +802,47 @@ make_stats_send_master(struct stats *st,struct stats_packet *st_packet_pool)
 
         for (j = 0; j < array_n(&stp->metric); j++) {
             struct stats_metric *stm = array_get(&stp->metric, j);
+            struct stats_packet * sp = array_push(st_packet_array);
+            sp->type = 0;
+            sp->pidx = i;
+            sp->fidx = j;
+            sp->plus_counter = stm->plus_counter;
+            sp->minus_counter = stm->minus_counter;
 
-//            log_error("stp metric %d",j);
-            if((total+1)>=1024){
-                goto endfor;
-            }
-
-            st_packet_pool[total].type = 0;
-            st_packet_pool[total].pidx = i;
-            st_packet_pool[total].fidx = j;
-            st_packet_pool[total].plus_counter = stm->plus_counter;
-            st_packet_pool[total].minus_counter = stm->minus_counter;
-            //nc_memcpy(&st_packet_pool[total].metric,stm,sizeof(struct stats_metric));
+//            st_packet_pool[total].type = 0;
+//            st_packet_pool[total].pidx = i;
+//            st_packet_pool[total].fidx = j;
+//            st_packet_pool[total].plus_counter = stm->plus_counter;
+//            st_packet_pool[total].minus_counter = stm->minus_counter;
+//            //nc_memcpy(&st_packet_pool[total].metric,stm,sizeof(struct stats_metric));
             total++;
             stats_metric_init(stm);
 
         }
 
-        if((total+1)>=1024){
-            goto endfor;
-        }
 
         for (j = 0; j < array_n(&stp->server); j++) {
             struct stats_server *sts = array_get(&stp->server, j);
 
             for (k = 0; k < array_n(&sts->metric); k++) {
                 struct stats_metric *stm = array_get(&sts->metric, k);
-                if((total+1)>=1024){
-                    goto endfor;
-                }
+                struct stats_packet * sp = array_push(st_packet_array);
+                sp->type = 1;
+                sp->pidx = i;
+                sp->sidx = j;
+                sp->fidx = k;
+                sp->plus_counter = stm->plus_counter;
+                sp->minus_counter = stm->minus_counter;
 
-                st_packet_pool[total].type = 1;
-                st_packet_pool[total].pidx = i;
-                st_packet_pool[total].sidx = j;
-                st_packet_pool[total].fidx = k;
-                
-//                log_error("sts metric %d",k);
-
-                st_packet_pool[total].plus_counter = stm->plus_counter;
-                st_packet_pool[total].minus_counter = stm->minus_counter;
+//                st_packet_pool[total].type = 1;
+//                st_packet_pool[total].pidx = i;
+//                st_packet_pool[total].sidx = j;
+//                st_packet_pool[total].fidx = k;
+//                
+////                log_error("sts metric %d",k);
+//
+//                st_packet_pool[total].plus_counter = stm->plus_counter;
+//                st_packet_pool[total].minus_counter = stm->minus_counter;
                 //nc_memcpy(&st_packet_pool[total].metric,stm,sizeof(struct stats_metric));
                 total++;
                 stats_metric_init(stm);
@@ -851,11 +853,7 @@ make_stats_send_master(struct stats *st,struct stats_packet *st_packet_pool)
 
     }
 
-endfor:
-    {
-        st_packet_pool[total++].type = 2;
-        log_error("total=======%d",total);   
-    }
+
     return total;
 }
 
@@ -868,35 +866,50 @@ static void stats_send_master(struct context *ctx) {
     struct iovec iov[1];
 
 //    struct stats_packet *send_data = nc_alloc(sizeof(struct stats_packet) *1024);
-    struct stats_packet send_data[1024];
-    uint32_t total = make_stats_send_master(ctx->stats,send_data);
+    struct stats_packet send_data[2];
+    struct array all_stats_data;
+    array_init(&all_stats_data,128,sizeof(struct stats_packet));
+    uint32_t total = make_stats_send_master(ctx->stats,send_data,&all_stats_data);
     log_error("total = %d",total);
 
-    int i=0;
-    for (i=0;i<1024;++i){
-        struct stats_packet sp=send_data[i];
+//    int i=0;
+//    for (i=0;i<128;++i){
+//        struct stats_packet sp=send_data[i];
+//
+//        //log_error("get stats_packet type=%d, pidx=%d,fidx=%d,plus_counter=%d,minous_counter=%d",sp.type,sp.pidx,sp.fidx,sp.metric.plus_counter,sp.metric.minus_counter);
+//        if(sp.type==2){
+//            break;
+//        }
+//
+//    }
 
-        //log_error("get stats_packet type=%d, pidx=%d,fidx=%d,plus_counter=%d,minous_counter=%d",sp.type,sp.pidx,sp.fidx,sp.metric.plus_counter,sp.metric.minus_counter);
-        if(sp.type==2){
-            break;
+    int i = 0;
+    while(i<total){
+        int j = 0;
+        for(j=0; j<1; ++j){
+            send_data[j] = *(struct stats_packet *)array_get(&all_stats_data,i);
+            ++i;
         }
 
-    }
+        //send end sentinel element
+        send_data[j].type = 2;
 
-    iov[0].iov_base = (char *) send_data;
-    iov[0].iov_len = sizeof(struct stats_packet) * 1024;
-    log_error("length = %d",iov[0].iov_len);
+        iov[0].iov_base = (char *) send_data;
+        iov[0].iov_len = sizeof(struct stats_packet) * 2;
+        log_error("length = %d",iov[0].iov_len);
+    
+     
+        msghdr.msg_name = NULL;
+        msghdr.msg_namelen = 0;
+        msghdr.msg_iov = iov;
+        msghdr.msg_iovlen = 1;
+     
+        ret = sendmsg( ctx->channel[1], &msghdr, MSG_DONTWAIT );
+        if( ret < 0 )
+        {
+            log_error( "sendmsg failed" );
+        }
 
- 
-    msghdr.msg_name = NULL;
-    msghdr.msg_namelen = 0;
-    msghdr.msg_iov = iov;
-    msghdr.msg_iovlen = 1;
- 
-    ret = sendmsg( ctx->channel[1], &msghdr, MSG_DONTWAIT );
-    if( ret < 0 )
-    {
-        log_error( "sendmsg failed" );
     }
 
 //    nc_free(send_data);
@@ -911,12 +924,12 @@ static int receive_message( struct context *ctx )
 {
     int ret;
     int i;
- 
+    struct stats_packet stats_packet_pool[2];
+    uint32_t expect = sizeof(struct stats_packet) * 2; 
     struct msghdr msghdr = {0};
     struct iovec iov[1];
-    struct stats_packet stats_packet_pool[1024];
     iov[0].iov_base = stats_packet_pool;
-    iov[0].iov_len =  sizeof(struct stats_packet) * 1024;
+    iov[0].iov_len =  expect;
 
  
     msghdr.msg_name = NULL;
@@ -924,18 +937,31 @@ static int receive_message( struct context *ctx )
     msghdr.msg_iov = iov;
     msghdr.msg_iovlen = 1;
 
-        ret = recvmsg( ctx->channel[0], &msghdr, 0 );
+        ret = recvmsg( ctx->channel[0], &msghdr,0);
         if( ret < 0 )
         {
             log_error( "recvmsg failed" );
         }
 
+    if(ret<expect){
+     log_error( "small than expect errno = %d ret=%d",errno,ret );
+//     nc_memcpy(((char *)full_stats_packet_pool) + stats_pos, stats_packet_pool, ret);
+//     stats_pos = ret;
+//     
+    }
+
+//    if(stats_pos < expect){
+//        return stats_pos;
+//    }
+ 
+   //log_error( "recvmsg %d bytes",stats_pos );
+   // stats_pos = 0;
 
     struct stats *st = ctx->stats;
-    for(i=0; i<1024; ++i){
+    for(i=0; i<2; ++i){
         struct stats_packet sp = stats_packet_pool[i]; 
-        log_error("get stats_packet type=%d, pidx=%d,fidx=%d,plus_counter=%d,minous_counter=%d",sp.type,sp.pidx,sp.fidx,sp.plus_counter,sp.minus_counter);
 
+            log_error("get stats_packet type=%d, pidx=%d,fidx=%d,plus_counter=%d,minous_counter=%d",sp.type,sp.pidx,sp.fidx,sp.plus_counter,sp.minus_counter);
         if(sp.type==2){
             break;
         }

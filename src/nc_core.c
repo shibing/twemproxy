@@ -138,7 +138,7 @@ core_ctx_create(struct instance *nci)
     pid_t pid; 
     int i = 0;
     //TODO need change 8 to MARCRO
-    for(i =0; i< 1; ++i){
+    for(i =0; i< 7; ++i){
        pid = fork();
        switch (pid) {
        case -1:
@@ -147,11 +147,13 @@ core_ctx_create(struct instance *nci)
 
        case 0:
            //TODO do child process
+           close(ctx->channel[0]);
            process_loop(ctx,i);
            exit(1);
            break;
 
        default:
+           //close(ctx->channel[1]);
            /* parent terminates */
            break;
        }
