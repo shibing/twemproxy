@@ -85,7 +85,8 @@ struct stats_packet {
     uint8_t pidx;
     uint8_t sidx;
     uint8_t fidx;
-    struct stats_metric metric; 
+    int64_t   plus_counter;      /* accumulating counter */
+    int64_t   minus_counter;      /* accumulating counter */
 };
 
 
