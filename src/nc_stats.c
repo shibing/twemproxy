@@ -949,7 +949,7 @@ static int receive_message( struct context *ctx ,int fd)
 
     if(ret<expect){
      log_error( "small than expect errno = %d ret=%d",errno,ret );
-     return NC_ERROR;
+//     return NC_ERROR;
 //     nc_memcpy(((char *)full_stats_packet_pool) + stats_pos, stats_packet_pool, ret);
 //     stats_pos = ret;
 //     
