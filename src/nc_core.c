@@ -65,23 +65,6 @@ core_ctx_create(struct instance *nci)
     }
 
 
-    //create socket pair
-    //TODO check whether child can send message to master
-    //TODO move these codes to function
-    if(socketpair(AF_UNIX, SOCK_STREAM, 0, ctx->channel) == -1){
-        log_error("[master] sockpair create domain socket failed");
-    }
-    //set noblock
-    status = nc_set_nonblocking(ctx->channel[0]);
-    if (status < 0) {
-        log_error("set nonblock on p %d ", ctx->channel[0]);
-        return NC_ERROR;
-    }
-    status = nc_set_nonblocking(ctx->channel[1]);
-    if (status < 0) {
-        log_error("set nonblock on p %d ", ctx->channel[0]);
-        return NC_ERROR;
-    }
 
     /* create stats per server pool */
     ctx->stats = stats_create(ctx,nci->stats_port, nci->stats_addr, nci->stats_interval,
@@ -130,15 +113,28 @@ core_ctx_create(struct instance *nci)
     }
 
 
-
-
-     
-
-
     pid_t pid; 
     int i = 0;
     //TODO need change 8 to MARCRO
     for(i =0; i< 8; ++i){
+        //create socket pair
+        //TODO check whether child can send message to master
+        //TODO move these codes to function
+        if(socketpair(AF_UNIX, SOCK_STREAM, 0, nc_processes[i].channel) == -1){
+            log_error("[master] sockpair create domain socket failed");
+        }
+        //set noblock
+        status = nc_set_nonblocking(nc_processes[i].channel[0]);
+        if (status < 0) {
+            log_error("set nonblock on p %d ", nc_processes[i].channel[0]);
+            return NC_ERROR;
+        }
+        status = nc_set_nonblocking(nc_processes[i].channel[1]);
+        if (status < 0) {
+            log_error("set nonblock on p %d ", nc_processes[i].channel[0]);
+            return NC_ERROR;
+        }
+
        pid = fork();
        switch (pid) {
        case -1:
@@ -147,13 +143,27 @@ core_ctx_create(struct instance *nci)
 
        case 0:
            //TODO do child process
-           close(ctx->channel[0]);
+           //close(ctx->channel[0]);
            process_loop(ctx,i);
            exit(1);
            break;
 
        default:
            //close(ctx->channel[1]);
+           {           
+            struct epoll_event channel_ev;
+            channel_ev.data.fd = nc_processes[i].channel[0];
+            channel_ev.events = EPOLLIN;
+       
+            status = epoll_ctl(ctx->stats->ep, EPOLL_CTL_ADD, nc_processes[i].channel[0], &channel_ev);
+            if (status < 0) {
+                log_error("epoll ctl on e %d sd %d failed: %s", ctx->stats->ep, ctx->stats->sd,
+                          strerror(errno));
+                return NC_ERROR;
+            }
+
+           }
+
            /* parent terminates */
            break;
        }

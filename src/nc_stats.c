@@ -26,7 +26,7 @@
 
 #include <nc_core.h>
 #include <nc_server.h>
-
+#include <nc_process.h>
 struct stats_desc {
     char *name; /* stats name */
     char *desc; /* stats description */
@@ -865,15 +865,15 @@ static void stats_send_master(struct context *ctx) {
     struct msghdr msghdr = {0}; 
     struct iovec iov[1];
 
-//    struct stats_packet *send_data = nc_alloc(sizeof(struct stats_packet) *128);
-    struct stats_packet send_data[128];
+//    struct stats_packet *send_data = nc_alloc(sizeof(struct stats_packet) *2048);
+    struct stats_packet send_data[2048];
     struct array all_stats_data;
-    array_init(&all_stats_data,128,sizeof(struct stats_packet));
+    array_init(&all_stats_data,2048,sizeof(struct stats_packet));
     uint32_t total = make_stats_send_master(ctx->stats,send_data,&all_stats_data);
     log_error("total = %d",total);
 
 //    int i=0;
-//    for (i=0;i<128;++i){
+//    for (i=0;i<2048;++i){
 //        struct stats_packet sp=send_data[i];
 //
 //        //log_error("get stats_packet type=%d, pidx=%d,fidx=%d,plus_counter=%d,minous_counter=%d",sp.type,sp.pidx,sp.fidx,sp.metric.plus_counter,sp.metric.minus_counter);
@@ -886,7 +886,7 @@ static void stats_send_master(struct context *ctx) {
     int i = 0;
     while(i<total){
         int j = 0;
-        for(j=0; j<128; ++j){
+        for(j=0; j<2047; ++j){
             send_data[j] = *(struct stats_packet *)array_get(&all_stats_data,i);
             ++i;
             if(i>=total){
@@ -898,7 +898,7 @@ static void stats_send_master(struct context *ctx) {
         send_data[j].type = 2;
 
         iov[0].iov_base = (char *) send_data;
-        iov[0].iov_len = sizeof(struct stats_packet) * 128;
+        iov[0].iov_len = sizeof(struct stats_packet) * 2048;
         log_error("length = %d",iov[0].iov_len);
     
      
@@ -907,7 +907,7 @@ static void stats_send_master(struct context *ctx) {
         msghdr.msg_iov = iov;
         msghdr.msg_iovlen = 1;
      
-        ret = sendmsg( ctx->channel[1], &msghdr, MSG_DONTWAIT );
+        ret = sendmsg( nc_processes[nc_current_process_slot].channel[1], &msghdr, MSG_DONTWAIT );
         if( ret < 0 )
         {
             log_error( "sendmsg failed" );
@@ -923,12 +923,12 @@ static void stats_send_master(struct context *ctx) {
 
 
 
-static int receive_message( struct context *ctx )
+static int receive_message( struct context *ctx ,int fd)
 {
     uint32_t ret;
     int i;
-    struct stats_packet stats_packet_pool[128];
-    uint32_t expect = sizeof(struct stats_packet) * 128; 
+    struct stats_packet stats_packet_pool[2048];
+    uint32_t expect = sizeof(struct stats_packet) * 2048; 
     struct msghdr msghdr = {0};
     struct iovec iov[1];
     iov[0].iov_base = stats_packet_pool;
@@ -940,7 +940,7 @@ static int receive_message( struct context *ctx )
     msghdr.msg_iov = iov;
     msghdr.msg_iovlen = 1;
 
-        ret = recvmsg( ctx->channel[0], &msghdr,0);
+        ret = recvmsg( fd, &msghdr,0);
         if( ret < 0 )
         {
             log_error( "recvmsg failed" );
@@ -963,7 +963,7 @@ static int receive_message( struct context *ctx )
    // stats_pos = 0;
 
     struct stats *st = ctx->stats;
-    for(i=0; i<128; ++i){
+    for(i=0; i<2048; ++i){
         struct stats_packet sp = stats_packet_pool[i]; 
 
 //            log_error("get stats_packet type=%d, pidx=%d,fidx=%d,plus_counter=%d,minous_counter=%d",sp.type,sp.pidx,sp.fidx,sp.plus_counter,sp.minus_counter);
@@ -1034,8 +1034,8 @@ stats_loop(void *arg)
                 /* send aggregate stats sum (c) to collector */
                 stats_send_rsp(st);
 
-            } else if( events[i].data.fd == ctx->channel[0] && events[i].events&EPOLLIN ){
-                receive_message(ctx);        
+            } else { //if( events[i].data.fd == ctx->channel[0] && events[i].events&EPOLLIN ){
+                receive_message(ctx,events[i].data.fd);        
                 log_error("channel 0 come in"); 
         
             }
@@ -1145,16 +1145,6 @@ stats_start_aggregator(struct context *ctx,struct stats *st)
         return NC_ERROR;
     }
 
-    struct epoll_event channel_ev;
-    channel_ev.data.fd = ctx->channel[0];
-    channel_ev.events = EPOLLIN;
-
-    status = epoll_ctl(st->ep, EPOLL_CTL_ADD, ctx->channel[0], &channel_ev);
-    if (status < 0) {
-        log_error("epoll ctl on e %d sd %d failed: %s", st->ep, st->sd,
-                  strerror(errno));
-        return NC_ERROR;
-    }
 
 
     status = pthread_create(&st->tid, NULL, stats_loop, ctx);
