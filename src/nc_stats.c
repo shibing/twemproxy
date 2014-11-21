@@ -857,6 +857,11 @@ make_stats_send_master(struct stats *st,struct stats_packet *st_packet_pool,stru
     return total;
 }
 
+#define NC_STAT_BUFF_SIZE 2048
+
+struct stats_packet full_stats_packet_pool[NC_MAX_PROCESSES][NC_STAT_BUFF_SIZE];
+uint32_t full_stats_packet_pool_pos[NC_MAX_PROCESSES];
+
 static void stats_send_master(struct context *ctx) {
 
     
@@ -865,28 +870,18 @@ static void stats_send_master(struct context *ctx) {
     struct msghdr msghdr = {0}; 
     struct iovec iov[1];
 
-//    struct stats_packet *send_data = nc_alloc(sizeof(struct stats_packet) *2048);
-    struct stats_packet send_data[2048];
+//    struct stats_packet *send_data = nc_alloc(sizeof(struct stats_packet) *NC_STAT_BUFF_SIZE);
+    struct stats_packet send_data[NC_STAT_BUFF_SIZE];
     struct array all_stats_data;
-    array_init(&all_stats_data,2048,sizeof(struct stats_packet));
+    array_init(&all_stats_data,NC_STAT_BUFF_SIZE,sizeof(struct stats_packet));
     uint32_t total = make_stats_send_master(ctx->stats,send_data,&all_stats_data);
     log_error("total = %d",total);
 
-//    int i=0;
-//    for (i=0;i<2048;++i){
-//        struct stats_packet sp=send_data[i];
-//
-//        //log_error("get stats_packet type=%d, pidx=%d,fidx=%d,plus_counter=%d,minous_counter=%d",sp.type,sp.pidx,sp.fidx,sp.metric.plus_counter,sp.metric.minus_counter);
-//        if(sp.type==2){
-//            break;
-//        }
-//
-//    }
 
     int i = 0;
     while(i<total){
         int j = 0;
-        for(j=0; j<2047; ++j){
+        for(j=0; j<NC_STAT_BUFF_SIZE - 1; ++j){
             send_data[j] = *(struct stats_packet *)array_get(&all_stats_data,i);
             ++i;
             if(i>=total){
@@ -898,7 +893,7 @@ static void stats_send_master(struct context *ctx) {
         send_data[j].type = 2;
 
         iov[0].iov_base = (char *) send_data;
-        iov[0].iov_len = sizeof(struct stats_packet) * 2048;
+        iov[0].iov_len = sizeof(struct stats_packet) * NC_STAT_BUFF_SIZE;
         log_error("length = %d",iov[0].iov_len);
     
      
@@ -915,7 +910,6 @@ static void stats_send_master(struct context *ctx) {
 
     }
 
-//    nc_free(send_data);
  
  
 }
@@ -923,12 +917,12 @@ static void stats_send_master(struct context *ctx) {
 
 
 
-static int receive_message( struct context *ctx ,int fd)
+static int receive_message( struct context *ctx ,int fd, int process_slot)
 {
     uint32_t ret;
     int i;
-    struct stats_packet stats_packet_pool[2048];
-    uint32_t expect = sizeof(struct stats_packet) * 2048; 
+    struct stats_packet stats_packet_pool[NC_STAT_BUFF_SIZE];
+    uint32_t expect = sizeof(struct stats_packet) * NC_STAT_BUFF_SIZE; 
     struct msghdr msghdr = {0};
     struct iovec iov[1];
     iov[0].iov_base = stats_packet_pool;
@@ -940,6 +934,7 @@ static int receive_message( struct context *ctx ,int fd)
     msghdr.msg_iov = iov;
     msghdr.msg_iovlen = 1;
 
+
         ret = recvmsg( fd, &msghdr,0);
         if( ret < 0 )
         {
@@ -948,57 +943,45 @@ static int receive_message( struct context *ctx ,int fd)
      log_error( "ret=%d expect=%d",ret,expect );
 
     if(ret<expect){
-     log_error( "small than expect errno = %d ret=%d",errno,ret );
-     return NC_ERROR;
-//     nc_memcpy(((char *)full_stats_packet_pool) + stats_pos, stats_packet_pool, ret);
-//     stats_pos = ret;
-//     
+    
+       log_error( "small than expect errno = %d ret=%d",errno,ret );
     }
 
-//    if(stats_pos < expect){
-//        return stats_pos;
-//    }
+    nc_memcpy(((char *)full_stats_packet_pool[process_slot]) + full_stats_packet_pool_pos[process_slot], stats_packet_pool, ret);
+    full_stats_packet_pool_pos[process_slot] += ret;
+
+
+    if(full_stats_packet_pool_pos[process_slot] < expect){
+        log_error( "xxxxxxxxx %d===%d",full_stats_packet_pool_pos[process_slot],expect );
+        return full_stats_packet_pool_pos[process_slot];
+    }
  
-   //log_error( "recvmsg %d bytes",stats_pos );
-   // stats_pos = 0;
+   log_error( "full_stats_packet_pool_size %d bytes",full_stats_packet_pool_pos[process_slot] );
+   full_stats_packet_pool_pos[process_slot] = 0;
 
     struct stats *st = ctx->stats;
-    for(i=0; i<2048; ++i){
-        struct stats_packet sp = stats_packet_pool[i]; 
+    for(i=0; i<NC_STAT_BUFF_SIZE; ++i){
+//        struct stats_packet sp = stats_packet_pool[i]; 
+        struct stats_packet sp = full_stats_packet_pool[process_slot][i]; 
 
-//            log_error("get stats_packet type=%d, pidx=%d,fidx=%d,plus_counter=%d,minous_counter=%d",sp.type,sp.pidx,sp.fidx,sp.plus_counter,sp.minus_counter);
+            log_error("get stats_packet type=%d, pidx=%d,fidx=%d,plus_counter=%d,minous_counter=%d",sp.type,sp.pidx,sp.fidx,sp.plus_counter,sp.minus_counter);
         if(sp.type==2){
             break;
         }
         //TODO set the data to the mater process data
         
         if(sp.type==0){
-           //switch(sp.metric.type) {
-           //case STATS_COUNTER:
-           //case STATS_GAUGE:
-                //log_error("get stats_packet name = %.*s type=%d, pidx=%d,fidx=%d, counter=%d",sp.metric.name.len,sp.metric.name.data,sp.type,sp.pidx,sp.fidx,sp.metric.value.counter);
                 _master_stats_pool_set_by(ctx,array_get(&st->sum,sp.pidx),&sp);
-           //default:
-           //     NOT_REACHED();
-           //}
         } 
 
         if(sp.type==1){
            struct stats_pool *stp = array_get(&st->sum, sp.pidx);
-           //switch(sp.metric.type) {
-           //case STATS_COUNTER:
-           //case STATS_GAUGE:
-                //log_error("get stats_packet name = %.*s type=%d, pidx=%d,fidx=%d, counter=%d",sp.metric.name.len,sp.metric.name.data,sp.type,sp.pidx,sp.fidx,sp.metric.value.counter);
                 _master_stats_server_set_by(ctx,array_get(&stp->server,sp.sidx),&sp);
-           //default:
-           //     NOT_REACHED();
-           //}
         } 
     }
-//    msghdr.msg_control = (caddr_t)&cmsg;
-//    msghdr.msg_controllen = sizeof(cmsg);
     return 0;
 }
+
 
 void *
 stats_loop(void *arg)
@@ -1007,6 +990,7 @@ stats_loop(void *arg)
     struct stats *st = ctx->stats;
     int n;
     int i;
+    int j;
 
     for (;;) {
         struct epoll_event events[1024];
@@ -1035,7 +1019,16 @@ stats_loop(void *arg)
                 stats_send_rsp(st);
 
             } else { //if( events[i].data.fd == ctx->channel[0] && events[i].events&EPOLLIN ){
-                receive_message(ctx,events[i].data.fd);        
+                for(j = 0;j<NC_MAX_PROCESSES;++j){
+                    if (nc_processes[j].channel[0] == events[i].data.fd){
+                        break;
+                    }
+                }
+                if (j>=NC_MAX_PROCESSES){
+                    log_error("not find sd in process");
+                }
+
+                receive_message(ctx,events[i].data.fd,j);        
                 log_error("channel 0 come in"); 
         
             }
