@@ -22,6 +22,8 @@
 
 #include <nc_core.h>
 
+#include <nc_sharray.h>
+
 #define STATS_POOL_CODEC(ACTION)                                                                            \
     /* client behavior */                                                                                   \
     ACTION( client_eof,             STATS_COUNTER,      "# eof on client connections")                      \
@@ -77,7 +79,7 @@ struct stats_metric {
 
 struct stats_server {
     struct string name;   /* server name (ref) */
-    struct array  metric; /* stats_metric[] for server codec */
+    struct sharray  metric; /* stats_metric[] for server codec */
 };
 
 struct stats_packet {
@@ -92,7 +94,7 @@ struct stats_packet {
 
 struct stats_pool {
     struct string name;   /* pool name (ref) */
-    struct array  metric; /* stats_metric[] for pool codec */
+    struct sharray  metric; /* stats_metric[] for pool codec */
     struct array  server; /* stats_server[] */
 };
 

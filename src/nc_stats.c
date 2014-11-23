@@ -27,6 +27,7 @@
 #include <nc_core.h>
 #include <nc_server.h>
 #include <nc_process.h>
+
 struct stats_desc {
     char *name; /* stats name */
     char *desc; /* stats description */
@@ -40,6 +41,8 @@ static struct stats_metric stats_pool_codec[] = {
 static struct stats_metric stats_server_codec[] = {
     STATS_SERVER_CODEC( DEFINE_ACTION )
 };
+
+
 #undef DEFINE_ACTION
 
 #define DEFINE_ACTION(_name, _type, _desc) { .name = #_name, .desc = _desc },
@@ -107,33 +110,33 @@ stats_metric_init(struct stats_metric *stm)
 }
 
 static void
-stats_metric_reset(struct array *stats_metric)
+stats_metric_reset(struct sharray *stats_metric)
 {
     uint32_t i, nmetric;
 
-    nmetric = array_n(stats_metric);
+    nmetric = sharray_n(stats_metric);
     ASSERT(nmetric == STATS_POOL_NFIELD || nmetric == STATS_SERVER_NFIELD);
 
     for (i = 0; i < nmetric; i++) {
-        struct stats_metric *stm = array_get(stats_metric, i);
+        struct stats_metric *stm = sharray_get(stats_metric, i);
 
         stats_metric_init(stm);
     }
 }
 
 static rstatus_t
-stats_pool_metric_init(struct array *stats_metric)
+stats_pool_metric_init(struct sharray *stats_metric)
 {
     rstatus_t status;
     uint32_t i, nfield = STATS_POOL_NFIELD;
 
-    status = array_init(stats_metric, nfield, sizeof(struct stats_metric));
+    status = sharray_init(stats_metric, nfield, sizeof(struct stats_metric));
     if (status != NC_OK) {
         return status;
     }
 
     for (i = 0; i < nfield; i++) {
-        struct stats_metric *stm = array_push(stats_metric);
+        struct stats_metric *stm = sharray_push(stats_metric);
 
         /* initialize from pool codec first */
         *stm = stats_pool_codec[i];
@@ -151,13 +154,13 @@ stats_server_metric_init(struct stats_server *sts)
     rstatus_t status;
     uint32_t i, nfield = STATS_SERVER_NFIELD;
 
-    status = array_init(&sts->metric, nfield, sizeof(struct stats_metric));
+    status = sharray_init(&sts->metric, nfield, sizeof(struct stats_metric));
     if (status != NC_OK) {
         return status;
     }
 
     for (i = 0; i < nfield; i++) {
-        struct stats_metric *stm = array_push(&sts->metric);
+        struct stats_metric *stm = sharray_push(&sts->metric);
 
         /* initialize from server codec first */
         *stm = stats_server_codec[i];
@@ -170,15 +173,15 @@ stats_server_metric_init(struct stats_server *sts)
 }
 
 static void
-stats_metric_deinit(struct array *metric)
+stats_metric_deinit(struct sharray *metric)
 {
     uint32_t i, nmetric;
 
-    nmetric = array_n(metric);
+    nmetric = sharray_n(metric);
     for (i = 0; i < nmetric; i++) {
-        array_pop(metric);
+        sharray_pop(metric);
     }
-    array_deinit(metric);
+    sharray_deinit(metric);
 }
 
 static rstatus_t
@@ -187,7 +190,7 @@ stats_server_init(struct stats_server *sts, struct server *s)
     rstatus_t status;
 
     sts->name = s->name;
-    array_null(&sts->metric);
+    sharray_null(&sts->metric);
 
     status = stats_server_metric_init(sts);
     if (status != NC_OK) {
@@ -195,7 +198,7 @@ stats_server_init(struct stats_server *sts, struct server *s)
     }
 
     log_debug(LOG_VVVERB, "init stats server '%.*s' with %"PRIu32" metric",
-              sts->name.len, sts->name.data, array_n(&sts->metric));
+              sts->name.len, sts->name.data, sharray_n(&sts->metric));
 
     return NC_OK;
 
@@ -252,7 +255,7 @@ stats_pool_init(struct stats_pool *stp, struct server_pool *sp)
     rstatus_t status;
 
     stp->name = sp->name;
-    array_null(&stp->metric);
+    sharray_null(&stp->metric);
     array_null(&stp->server);
 
     status = stats_pool_metric_init(&stp->metric);
@@ -268,7 +271,7 @@ stats_pool_init(struct stats_pool *stp, struct server_pool *sp)
 
     log_debug(LOG_VVVERB, "init stats pool '%.*s' with %"PRIu32" metric and "
               "%"PRIu32" server", stp->name.len, stp->name.data,
-              array_n(&stp->metric), array_n(&stp->metric));
+              sharray_n(&stp->metric), sharray_n(&stp->metric));
 
     return NC_OK;
 }
@@ -383,8 +386,8 @@ stats_create_buf(struct stats *st)
         size += stp->name.len;
         size += pool_extra;
 
-        for (j = 0; j < array_n(&stp->metric); j++) {
-            struct stats_metric *stm = array_get(&stp->metric, j);
+        for (j = 0; j < sharray_n(&stp->metric); j++) {
+            struct stats_metric *stm = sharray_get(&stp->metric, j);
 
             size += stm->name.len;
             size += int64_max_digits;
@@ -399,8 +402,8 @@ stats_create_buf(struct stats *st)
             size += sts->name.len;
             size += server_extra;
 
-            for (k = 0; k < array_n(&sts->metric); k++) {
-                struct stats_metric *stm = array_get(&sts->metric, k);
+            for (k = 0; k < sharray_n(&sts->metric); k++) {
+                struct stats_metric *stm = sharray_get(&sts->metric, k);
 
                 size += stm->name.len;
                 size += int64_max_digits;
@@ -606,13 +609,13 @@ stats_end_nesting(struct stats *st)
 }
 
 static rstatus_t
-stats_copy_metric(struct stats *st, struct array *metric)
+stats_copy_metric(struct stats *st, struct sharray *metric)
 {
     rstatus_t status;
     uint32_t i;
 
-    for (i = 0; i < array_n(metric); i++) {
-        struct stats_metric *stm = array_get(metric, i);
+    for (i = 0; i < sharray_n(metric); i++) {
+        struct stats_metric *stm = sharray_get(metric, i);
 
         status = stats_add_num(st, &stm->name, stm->value.counter);
         if (status != NC_OK) {
@@ -625,15 +628,15 @@ stats_copy_metric(struct stats *st, struct array *metric)
 
 
 static void
-stats_aggregate_metric(struct array *dst, struct array *src)
+stats_aggregate_metric(struct sharray *dst, struct sharray *src)
 {
     uint32_t i;
 
-    for (i = 0; i < array_n(src); i++) {
+    for (i = 0; i < sharray_n(src); i++) {
         struct stats_metric *stm1, *stm2;
 
-        stm1 = array_get(src, i);
-        stm2 = array_get(dst, i);
+        stm1 = sharray_get(src, i);
+        stm2 = sharray_get(dst, i);
 
         ASSERT(stm1->type == stm2->type);
 
@@ -800,8 +803,8 @@ make_stats_send_master(struct stats *st,struct stats_packet *st_packet_pool,stru
     for (i = 0; i < array_n(&st->sum); i++) {
         struct stats_pool *stp = array_get(&st->sum, i);
 
-        for (j = 0; j < array_n(&stp->metric); j++) {
-            struct stats_metric *stm = array_get(&stp->metric, j);
+        for (j = 0; j < sharray_n(&stp->metric); j++) {
+            struct stats_metric *stm = sharray_get(&stp->metric, j);
             struct stats_packet * sp = array_push(st_packet_array);
             sp->type = 0;
             sp->pidx = i;
@@ -824,8 +827,8 @@ make_stats_send_master(struct stats *st,struct stats_packet *st_packet_pool,stru
         for (j = 0; j < array_n(&stp->server); j++) {
             struct stats_server *sts = array_get(&stp->server, j);
 
-            for (k = 0; k < array_n(&sts->metric); k++) {
-                struct stats_metric *stm = array_get(&sts->metric, k);
+            for (k = 0; k < sharray_n(&sts->metric); k++) {
+                struct stats_metric *stm = sharray_get(&sts->metric, k);
                 struct stats_packet * sp = array_push(st_packet_array);
                 sp->type = 1;
                 sp->pidx = i;
@@ -1314,7 +1317,7 @@ stats_pool_to_metric(struct context *ctx, struct server_pool *pool,
 
     st = ctx->stats;
     stp = array_get(&st->current, pidx);
-    stm = array_get(&stp->metric, fidx);
+    stm = sharray_get(&stp->metric, fidx);
 
     st->updated = 1;
 
@@ -1407,7 +1410,7 @@ stats_server_to_metric(struct context *ctx, struct server *server,
     st = ctx->stats;
     stp = array_get(&st->current, pidx);
     sts = array_get(&stp->server, sidx);
-    stm = array_get(&sts->metric, fidx);
+    stm = sharray_get(&sts->metric, fidx);
 
     st->updated = 1;
 
@@ -1508,7 +1511,7 @@ master_stats_server_to_metric(struct context *ctx, struct stats_server *sts,
     st = ctx->stats;
     //stp = array_get(&st->current, pidx);
     //sts = array_get(&stp->server, sidx);
-    stm = array_get(&sts->metric, fidx);
+    stm = sharray_get(&sts->metric, fidx);
 
     st->updated = 1;
 
@@ -1552,7 +1555,7 @@ master_stats_pool_to_metric(struct context *ctx, struct stats_pool *pool,
 
     st = ctx->stats;
 //    stp = array_get(&st->current, pidx);
-    stm = array_get(&pool->metric, fidx);
+    stm = sharray_get(&pool->metric, fidx);
 
     st->updated = 1;
 
