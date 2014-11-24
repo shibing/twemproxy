@@ -1,9 +1,10 @@
 #include <stdlib.h>
 #include <nc_core.h>
-#include <nc_process.h>
 #include <nc_event.h>
 #include <nc_server.h>
-int nc_current_process_slot = 0;
+#include <sys/mman.h>
+#include <nc_process.h>
+int nc_current_process_slot = -1;
 
 
 static rstatus_t proxy_each_add_conn(void *elem, void *data)

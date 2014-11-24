@@ -79,7 +79,7 @@ struct stats_metric {
 
 struct stats_server {
     struct string name;   /* server name (ref) */
-    struct sharray  metric; /* stats_metric[] for server codec */
+    struct array  metric; /* stats_metric[] for server codec */
 };
 
 struct stats_packet {
@@ -87,14 +87,19 @@ struct stats_packet {
     uint8_t pidx;
     uint8_t sidx;
     uint8_t fidx;
-    int64_t   plus_counter;      /* accumulating counter */
-    int64_t   minus_counter;      /* accumulating counter */
+    struct string name;         /* name (ref) */
+    union {
+        int64_t   counter;      /* accumulating counter */
+        int64_t   timestamp;    /* monotonic timestamp */
+    } value;
 };
 
+//struct sharray child_stats[8]; //TODO 8 stats for each process
+void *child_stats;
 
 struct stats_pool {
     struct string name;   /* pool name (ref) */
-    struct sharray  metric; /* stats_metric[] for pool codec */
+    struct array  metric; /* stats_metric[] for pool codec */
     struct array  server; /* stats_server[] */
 };
 

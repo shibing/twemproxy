@@ -7,11 +7,13 @@ typedef struct {
     int                 status;
     int        channel[2];                                
     void               *data;   
+    struct stats       *stats;      /* stats */
     char               *name;                                      
+
 } nc_process_t;
 
 #define NC_MAX_PROCESSES         1024
-nc_process_t    nc_processes[NC_MAX_PROCESSES];
+nc_process_t    *nc_processes;
 extern int nc_current_process_slot;
 
 void process_loop(struct context *ctx, int process_index);

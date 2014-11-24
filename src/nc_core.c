@@ -26,6 +26,7 @@
 #include <nc_server.h>
 #include <nc_proxy.h>
 #include <nc_process.h>
+#include <sys/mman.h>
 
 static uint32_t ctx_id; /* context generation */
 
@@ -116,7 +117,7 @@ core_ctx_create(struct instance *nci)
     pid_t pid; 
     int i = 0;
     //TODO need change 8 to MARCRO
-    for(i =0; i< 8; ++i){
+    for(i =0; i< 1; ++i){
         //create socket pair
         //TODO check whether child can send message to master
         //TODO move these codes to function
@@ -144,7 +145,9 @@ core_ctx_create(struct instance *nci)
        case 0:
            //TODO do child process
            //close(ctx->channel[0]);
+           nc_current_process_slot = i;
            process_loop(ctx,i);
+
            exit(1);
            break;
 
@@ -196,6 +199,10 @@ core_start(struct instance *nci)
     mbuf_init(nci);
     msg_init();
     conn_init();
+    nc_processes = (nc_process_t *) mmap(NULL, NC_MAX_PROCESSES * sizeof(nc_process_t),
+                                PROT_READ|PROT_WRITE,
+                                MAP_ANON|MAP_SHARED, -1, 0); 
+
 
     ctx = core_ctx_create(nci);
     if (ctx != NULL) {
@@ -216,6 +223,8 @@ core_stop(struct context *ctx)
     conn_deinit();
     msg_deinit();
     mbuf_deinit();
+    munmap(nc_processes, NC_MAX_PROCESSES * sizeof(nc_process_t));
+
     core_ctx_destroy(ctx);
 }
 
