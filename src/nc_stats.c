@@ -298,35 +298,6 @@ stats_pool_reset(struct array *stats_pool)
     }
 }
 
-static rstatus_t
-stats_pool_map_share(struct array *stats_pool, struct array *server_pool)
-{
-    rstatus_t status;
-    uint32_t i, npool;
-
-    npool = array_n(server_pool);
-    ASSERT(npool != 0);
-
-    status = array_init(stats_pool, npool, sizeof(struct stats_pool));
-    if (status != NC_OK) {
-        return status;
-    }
-
-    for (i = 0; i < npool; i++) {
-        struct server_pool *sp = array_get(server_pool, i);
-        struct stats_pool *stp = array_push(stats_pool);
-
-        status = stats_pool_init(stp, sp);
-        if (status != NC_OK) {
-            return status;
-        }
-    }
-
-    log_debug(LOG_VVVERB, "map %"PRIu32" stats pools", npool);
-
-    return NC_OK;
-}
-
 
 static rstatus_t
 stats_pool_map(struct array *stats_pool, struct array *server_pool)
@@ -701,42 +672,39 @@ void
 stats_aggregate_all(struct stats *st)
 {
     uint32_t i,j,k;
-    struct stats_pool *stp1,*stp2;
-    for(i=0;i<1;++i){
+    struct stats_pool *stp;
+    struct stats_metric *stm; 
+    struct stats_server *sts;
+    for(i=0;i<NC_PROCESSES;++i){
          for(j=0;j<128;++j){ 
-            struct stats_packet * sp = child_stats + nc_current_process_slot + j;
-            log_error("stat_packet value=%d",sp->value.counter);
-         }
-        
-        //TODO
-        //log_error("aggregate child process %p",nc_processes[i].stats);
-        //print_stats(nc_processes[i].stats);
-/*        for (j = 0; j < array_n(&nc_processes[i].stats->sum); j++) {
-            struct stats_pool *stp1, *stp2;
+            struct stats_packet * sp = child_stats + i + j;
+            log_error("stat_packet pidx=%d,sidx=%d,fidx=%d,value=%d",sp->pidx,sp->sidx,sp->fidx,sp->value.counter);
 
-            stp1 = array_get(&nc_processes[i].stats->sum, j);
-            stp2 = array_get(&st->sum, j);
-            stats_aggregate_metric(&stp2->metric, &stp1->metric);
-            uint32_t m;
-            for (m = 0; m < array_n(&stp1->metric); m++) {
-                struct stats_metric *stm1;
-                stm1 = array_get(&stp1->metric, m);
-
-                switch (stm1->type) {
-                case STATS_COUNTER:
-                    log_error("agggggggg %d",stm1->value.counter);
-                default:
-                    break;
+            stp =array_get(&st->sum,sp->pidx);
+            if (sp->type==0){
+                stm = array_get(&stp->metric, sp->fidx);
+                if(i==0 ){
+                    stm->value.counter = sp->value.counter;
+                } else {
+                    stm->value.counter += sp->value.counter;
+                }
+            } 
+            if (sp->type==1){
+                sts = array_get(&stp->server, sp->sidx);
+                stm = array_get(&sts->metric, sp->fidx);
+                if(i==0 ){
+                    stm->value.counter = sp->value.counter;
+                } else {
+                    stm->value.counter += sp->value.counter;
                 }
             }
 
-            for (k = 0; k < array_n(&stp1->server); k++) {
-                struct stats_server *sts1, *sts2;
-                sts1 = array_get(&stp1->server, k);
-                sts2 = array_get(&stp2->server, k);
-                stats_aggregate_metric(&sts2->metric, &sts1->metric);
+            if (sp->type==2){
+                break;
             }
-        }*/
+             
+         }
+        
 
     }    
 }
@@ -945,19 +913,6 @@ make_stats_send_master(struct stats *st,struct stats_packet *st_packet_pool,stru
                 sp->pidx = i;
                 sp->sidx = j;
                 sp->fidx = k;
-                //sp->plus_counter = stm->plus_counter;
-                //sp->minus_counter = stm->minus_counter;
-
-//                st_packet_pool[total].type = 1;
-//                st_packet_pool[total].pidx = i;
-//                st_packet_pool[total].sidx = j;
-//                st_packet_pool[total].fidx = k;
-//                
-////                log_error("sts metric %d",k);
-//
-//                st_packet_pool[total].plus_counter = stm->plus_counter;
-//                st_packet_pool[total].minus_counter = stm->minus_counter;
-                //nc_memcpy(&st_packet_pool[total].metric,stm,sizeof(struct stats_metric));
                 total++;
                 stats_metric_init(stm);
 
@@ -1125,9 +1080,6 @@ stats_loop(void *arg)
                 st->event = events[i];
 
                 stats_aggregate_all(st);
-                if (n == 0) {
-                    continue;
-                }
         
                 /* send aggregate stats sum (c) to collector */
                 stats_send_rsp(st);
@@ -1346,7 +1298,7 @@ stats_create(struct context *ctx,uint16_t stats_port, char *stats_ip, int stats_
 {
 
     uint32_t i = 0;
-    child_stats = (u_char *) mmap(NULL, sizeof(struct stats_packet) * 128,
+    child_stats = (struct stats_packet *) mmap(NULL, sizeof(struct stats_packet) * 128,
                                 PROT_READ|PROT_WRITE,
                                 MAP_ANON|MAP_SHARED, -1, 0); 
 

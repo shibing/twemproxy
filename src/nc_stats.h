@@ -95,7 +95,7 @@ struct stats_packet {
 };
 
 //struct sharray child_stats[8]; //TODO 8 stats for each process
-void *child_stats;
+struct stats_packet *child_stats;
 
 struct stats_pool {
     struct string name;   /* pool name (ref) */

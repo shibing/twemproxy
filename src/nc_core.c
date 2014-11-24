@@ -117,7 +117,7 @@ core_ctx_create(struct instance *nci)
     pid_t pid; 
     int i = 0;
     //TODO need change 8 to MARCRO
-    for(i =0; i< 1; ++i){
+    for(i =0; i< NC_PROCESSES; ++i){
         //create socket pair
         //TODO check whether child can send message to master
         //TODO move these codes to function
