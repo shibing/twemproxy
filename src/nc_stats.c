@@ -680,8 +680,16 @@ stats_aggregate_all(struct stats *st)
             struct stats_packet * sp = child_stats + i + j;
             log_error("stat_packet pidx=%d,sidx=%d,fidx=%d,value=%d",sp->pidx,sp->sidx,sp->fidx,sp->value.counter);
 
+            if(array_n(&st->sum) <= sp->pidx){
+                break;
+            }
+
             stp =array_get(&st->sum,sp->pidx);
             if (sp->type==0){
+                if(array_n(&stp->metric) <= sp->fidx){
+                    break;
+                }
+
                 stm = array_get(&stp->metric, sp->fidx);
                 if(i==0 ){
                     stm->value.counter = sp->value.counter;
@@ -690,7 +698,16 @@ stats_aggregate_all(struct stats *st)
                 }
             } 
             if (sp->type==1){
+                if(array_n(&stp->server) <= sp->sidx){
+                    break;
+                }
+
                 sts = array_get(&stp->server, sp->sidx);
+
+                if(array_n(&sts->metric) <= sp->fidx){
+                    break;
+                }
+
                 stm = array_get(&sts->metric, sp->fidx);
                 if(i==0 ){
                     stm->value.counter = sp->value.counter;
