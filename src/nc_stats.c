@@ -677,8 +677,8 @@ stats_aggregate_all(struct stats *st)
     struct stats_server *sts;
     for(i=0;i<NC_PROCESSES;++i){
          for(j=0;j<128;++j){ 
-            struct stats_packet * sp = child_stats + i + j;
-            log_error("stat_packet pidx=%d,sidx=%d,fidx=%d,value=%d",sp->pidx,sp->sidx,sp->fidx,sp->value.counter);
+            struct stats_packet * sp = child_stats + i*128 + j;
+            log_error("sp=%p,i=%d,j=%d,stat_packet pidx=%d,sidx=%d,fidx=%d,value=%d,type=%d",sp,i,j,sp->pidx,sp->sidx,sp->fidx,sp->value.counter,sp->type);
 
             if(array_n(&st->sum) <= sp->pidx){
                 break;
@@ -691,7 +691,7 @@ stats_aggregate_all(struct stats *st)
                 }
 
                 stm = array_get(&stp->metric, sp->fidx);
-                if(i==0 ){
+                if(i==0){
                     stm->value.counter = sp->value.counter;
                 } else {
                     stm->value.counter += sp->value.counter;
@@ -709,7 +709,7 @@ stats_aggregate_all(struct stats *st)
                 }
 
                 stm = array_get(&sts->metric, sp->fidx);
-                if(i==0 ){
+                if(i==0){
                     stm->value.counter = sp->value.counter;
                 } else {
                     stm->value.counter += sp->value.counter;
@@ -1138,12 +1138,14 @@ void stats_child_data(struct stats *st){
 
         for (j = 0; j < array_n(&stp->metric); j++) {
             struct stats_metric *stm = array_get(&stp->metric, j);
-            struct stats_packet * sp = child_stats + nc_current_process_slot + total;//sharray_push(&child_stats[nc_current_process_slot]);
+            struct stats_packet * sp = child_stats + nc_current_process_slot*128 + total;//sharray_push(&child_stats[nc_current_process_slot]);
             sp->type = 0;
             sp->pidx = i;
             sp->fidx = j;
             sp->value.timestamp = stm->value.timestamp;
             sp->value.counter = stm->value.counter;
+//            log_error("sp=%p nc_current_process_slot =  %d,stat_packet pidx=%d,sidx=%d,fidx=%d,value=%d,type=%d",sp,nc_current_process_slot,sp->pidx,sp->sidx,sp->fidx,sp->value.counter,sp->type);
+
             total++;
 
         }
@@ -1168,6 +1170,15 @@ void stats_child_data(struct stats *st){
         }
 
     }
+
+    struct stats_packet * sp = child_stats + nc_current_process_slot + total ;//sharray_push(&child_stats[nc_current_process_slot]);
+    sp->type = 2;
+    sp->pidx = 0;
+    sp->sidx = 0;
+    sp->fidx = 0;
+    sp->value.counter = 0;
+    total++;
+
 
 }
 static void *
