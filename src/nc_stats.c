@@ -676,8 +676,8 @@ stats_aggregate_all(struct stats *st)
     struct stats_metric *stm; 
     struct stats_server *sts;
     for(i=0;i<NC_PROCESSES;++i){
-         for(j=0;j<128;++j){ 
-            struct stats_packet * sp = child_stats + i*128 + j;
+         for(j=0;j<(STATS_POOL_NFIELD + STATS_SERVER_NFIELD);++j){ 
+            struct stats_packet * sp = child_stats + i*(STATS_POOL_NFIELD + STATS_SERVER_NFIELD) + j;
             log_error("sp=%p,i=%d,j=%d,stat_packet pidx=%d,sidx=%d,fidx=%d,value=%d,type=%d",sp,i,j,sp->pidx,sp->sidx,sp->fidx,sp->value.counter,sp->type);
 
             if(array_n(&st->sum) <= sp->pidx){
@@ -1138,7 +1138,7 @@ void stats_child_data(struct stats *st){
 
         for (j = 0; j < array_n(&stp->metric); j++) {
             struct stats_metric *stm = array_get(&stp->metric, j);
-            struct stats_packet * sp = child_stats + nc_current_process_slot*128 + total;//sharray_push(&child_stats[nc_current_process_slot]);
+            struct stats_packet * sp = child_stats + nc_current_process_slot*(STATS_POOL_NFIELD+STATS_SERVER_NFIELD) + total;//sharray_push(&child_stats[nc_current_process_slot]);
             sp->type = 0;
             sp->pidx = i;
             sp->fidx = j;
@@ -1171,13 +1171,13 @@ void stats_child_data(struct stats *st){
 
     }
 
-    struct stats_packet * sp = child_stats + nc_current_process_slot + total ;//sharray_push(&child_stats[nc_current_process_slot]);
-    sp->type = 2;
-    sp->pidx = 0;
-    sp->sidx = 0;
-    sp->fidx = 0;
-    sp->value.counter = 0;
-    total++;
+    //struct stats_packet * sp = child_stats + nc_current_process_slot + total ;//sharray_push(&child_stats[nc_current_process_slot]);
+    //sp->type = 2;
+    //sp->pidx = 0;
+    //sp->sidx = 0;
+    //sp->fidx = 0;
+    //sp->value.counter = 0;
+    //total++;
 
 
 }
@@ -1326,13 +1326,10 @@ stats_create(struct context *ctx,uint16_t stats_port, char *stats_ip, int stats_
 {
 
     uint32_t i = 0;
-    child_stats = (struct stats_packet *) mmap(NULL, sizeof(struct stats_packet) * 128,
+    child_stats = (struct stats_packet *) mmap(NULL, sizeof(struct stats_packet) * (STATS_POOL_NFIELD + STATS_SERVER_NFIELD)*NC_PROCESSES,
                                 PROT_READ|PROT_WRITE,
                                 MAP_ANON|MAP_SHARED, -1, 0); 
 
-//    for(i=0; i<8; ++i){
-//        sharray_init(&child_stats[i],sizeof(struct stats_packet) , 128);
-//    }
 
     rstatus_t status;
     struct stats *st;
