@@ -57,12 +57,6 @@ static struct stats_desc stats_server_desc[] = {
 };
 #undef DEFINE_ACTION
 
-static void
-_master_stats_server_set_by(struct context *ctx, struct stats_server *sts, struct stats_packet *sp);
-static void
-_master_stats_pool_set_by(struct context *ctx, struct stats_pool *pool,
-                    struct stats_packet *sp);
-
 
 void
 stats_describe(void)
@@ -669,20 +663,17 @@ stats_aggregate_metric(struct array *dst, struct array *src)
     }
 }
 
-void
+static void
 stats_aggregate_all(struct stats *st)
 {
-    uint32_t i,j,k;
+    uint32_t i,j;
     struct stats_pool *stp;
     struct stats_metric *stm; 
     struct stats_server *sts;
     for(i=0;i<NC_PROCESSES;++i){
-         log_error("i======%d",i);
          for(j=0;j<(STATS_POOL_NFIELD + STATS_SERVER_NFIELD);++j){ 
             struct stats_packet * sp = child_stats + i*(STATS_POOL_NFIELD + STATS_SERVER_NFIELD) + j;
-            if (sp->sidx==0 && sp->fidx==4 &&sp->type==1){
-                log_error("sp=%p,i=%d,j=%d,stat_packet pidx=%d,sidx=%d,fidx=%d,value=%d,type=%d",sp,i,j,sp->pidx,sp->sidx,sp->fidx,sp->value.counter,sp->type);
-            }
+            log_error("sp=%p,i=%d,j=%d,stat_packet pidx=%d,sidx=%d,fidx=%d,value=%d,type=%d",sp,i,j,sp->pidx,sp->sidx,sp->fidx,sp->value.counter,sp->type);
 
             if(array_n(&st->sum) <= sp->pidx){
                 break;
@@ -731,10 +722,9 @@ stats_aggregate_all(struct stats *st)
 }
 
 
-rstatus_t
+static void
 print_metric(struct array *metric)
 {
-    rstatus_t status;
     uint32_t i;
 
     struct string s = string("requests");
@@ -746,10 +736,9 @@ print_metric(struct array *metric)
         }
     }
 
-    return NC_OK;
 }
 
-void print_stats(struct stats *st){
+static void print_stats(struct stats *st){
     uint32_t i;
     for (i = 0; i < array_n(&st->sum); i++) {
         struct stats_pool *stp = array_get(&st->sum, i);
@@ -895,186 +884,6 @@ stats_send_rsp(struct stats *st)
 }
 
 
-static uint32_t
-make_stats_send_master(struct stats *st,struct stats_packet *st_packet_pool,struct array *st_packet_array)
-{
-    uint32_t i,j,k;
-
-
-    //TODO init array 
-    int total = 0; 
-    for (i = 0; i < array_n(&st->sum); i++) {
-        struct stats_pool *stp = array_get(&st->sum, i);
-
-        for (j = 0; j < array_n(&stp->metric); j++) {
-            struct stats_metric *stm = array_get(&stp->metric, j);
-            struct stats_packet * sp = array_push(st_packet_array);
-            sp->type = 0;
-            sp->pidx = i;
-            sp->fidx = j;
-            //sp->plus_counter = stm->plus_counter;
-            //sp->minus_counter = stm->minus_counter;
-
-//            st_packet_pool[total].type = 0;
-//            st_packet_pool[total].pidx = i;
-//            st_packet_pool[total].fidx = j;
-//            st_packet_pool[total].plus_counter = stm->plus_counter;
-//            st_packet_pool[total].minus_counter = stm->minus_counter;
-//            //nc_memcpy(&st_packet_pool[total].metric,stm,sizeof(struct stats_metric));
-            total++;
-            stats_metric_init(stm);
-
-        }
-
-
-        for (j = 0; j < array_n(&stp->server); j++) {
-            struct stats_server *sts = array_get(&stp->server, j);
-
-            for (k = 0; k < array_n(&sts->metric); k++) {
-                struct stats_metric *stm = array_get(&sts->metric, k);
-                struct stats_packet * sp = array_push(st_packet_array);
-                sp->type = 1;
-                sp->pidx = i;
-                sp->sidx = j;
-                sp->fidx = k;
-                total++;
-                stats_metric_init(stm);
-
-            }
-
-        }
-
-    }
-
-
-    return total;
-}
-
-#define NC_STAT_BUFF_SIZE 2048
-
-struct stats_packet full_stats_packet_pool[NC_MAX_PROCESSES][NC_STAT_BUFF_SIZE];
-uint32_t full_stats_packet_pool_pos[NC_MAX_PROCESSES];
-
-static void stats_send_master(struct context *ctx) {
-
-    
-    int ret;
- 
-    struct msghdr msghdr = {0}; 
-    struct iovec iov[1];
-
-//    struct stats_packet *send_data = nc_alloc(sizeof(struct stats_packet) *NC_STAT_BUFF_SIZE);
-    struct stats_packet send_data[NC_STAT_BUFF_SIZE];
-    struct array all_stats_data;
-    array_init(&all_stats_data,NC_STAT_BUFF_SIZE,sizeof(struct stats_packet));
-    uint32_t total = make_stats_send_master(ctx->stats,send_data,&all_stats_data);
-    log_error("total = %d",total);
-
-
-    int i = 0;
-    while(i<total){
-        int j = 0;
-        for(j=0; j<NC_STAT_BUFF_SIZE - 1; ++j){
-            send_data[j] = *(struct stats_packet *)array_get(&all_stats_data,i);
-            ++i;
-            if(i>=total){
-                break;
-            }
-        }
-
-        //send end sentinel element
-        send_data[j].type = 2;
-
-        iov[0].iov_base = (char *) send_data;
-        iov[0].iov_len = sizeof(struct stats_packet) * NC_STAT_BUFF_SIZE;
-        log_error("length = %d",iov[0].iov_len);
-    
-     
-        msghdr.msg_name = NULL;
-        msghdr.msg_namelen = 0;
-        msghdr.msg_iov = iov;
-        msghdr.msg_iovlen = 1;
-     
-        ret = sendmsg( nc_processes[nc_current_process_slot].channel[1], &msghdr, MSG_DONTWAIT );
-        if( ret < 0 )
-        {
-            log_error( "sendmsg failed" );
-        }
-
-    }
-
- 
- 
-}
-
-
-
-
-static int receive_message( struct context *ctx ,int fd, int process_slot)
-{
-    uint32_t ret;
-    int i;
-    struct stats_packet stats_packet_pool[NC_STAT_BUFF_SIZE];
-    uint32_t expect = sizeof(struct stats_packet) * NC_STAT_BUFF_SIZE; 
-    struct msghdr msghdr = {0};
-    struct iovec iov[1];
-    iov[0].iov_base = stats_packet_pool;
-    iov[0].iov_len =  expect;
-
- 
-    msghdr.msg_name = NULL;
-    msghdr.msg_namelen = 0;
-    msghdr.msg_iov = iov;
-    msghdr.msg_iovlen = 1;
-
-
-        ret = recvmsg( fd, &msghdr,0);
-        if( ret < 0 )
-        {
-            log_error( "recvmsg failed" );
-        }
-     log_error( "ret=%d expect=%d",ret,expect );
-
-    if(ret<expect){
-    
-       log_error( "small than expect errno = %d ret=%d",errno,ret );
-    }
-
-    nc_memcpy(((char *)full_stats_packet_pool[process_slot]) + full_stats_packet_pool_pos[process_slot], stats_packet_pool, ret);
-    full_stats_packet_pool_pos[process_slot] += ret;
-
-
-    if(full_stats_packet_pool_pos[process_slot] < expect){
-        log_error( "xxxxxxxxx %d===%d",full_stats_packet_pool_pos[process_slot],expect );
-        return full_stats_packet_pool_pos[process_slot];
-    }
- 
-   log_error( "full_stats_packet_pool_size %d bytes",full_stats_packet_pool_pos[process_slot] );
-   full_stats_packet_pool_pos[process_slot] = 0;
-
-    struct stats *st = ctx->stats;
-    for(i=0; i<NC_STAT_BUFF_SIZE; ++i){
-//        struct stats_packet sp = stats_packet_pool[i]; 
-        struct stats_packet sp = full_stats_packet_pool[process_slot][i]; 
-
-            //log_error("get stats_packet type=%d, pidx=%d,fidx=%d,plus_counter=%d,minous_counter=%d",sp.type,sp.pidx,sp.fidx,sp.plus_counter,sp.minus_counter);
-        if(sp.type==2){
-            break;
-        }
-        //TODO set the data to the mater process data
-        
-        if(sp.type==0){
-                _master_stats_pool_set_by(ctx,array_get(&st->sum,sp.pidx),&sp);
-        } 
-
-        if(sp.type==1){
-           struct stats_pool *stp = array_get(&st->sum, sp.pidx);
-                _master_stats_server_set_by(ctx,array_get(&stp->server,sp.sidx),&sp);
-        } 
-    }
-    return 0;
-}
-
 
 void *
 stats_loop(void *arg)
@@ -1135,7 +944,7 @@ stats_loop(void *arg)
 }
 
 
-void stats_child_data(struct stats *st){
+static void stats_child_data(struct stats *st){
     uint32_t i,j,k;
 
     //TODO init array 
@@ -1329,10 +1138,9 @@ stats_create(struct context *ctx,uint16_t stats_port, char *stats_ip, int stats_
              char *source, struct array *server_pool)
 {
 
-    uint32_t i = 0;
     child_stats = (struct stats_packet *) mmap(NULL, sizeof(struct stats_packet) * (STATS_POOL_NFIELD + STATS_SERVER_NFIELD)*NC_PROCESSES,
                                 PROT_READ|PROT_WRITE,
-                                MAP_ANON|MAP_SHARED, -1, 0); 
+                                MAP_ANON|MAP_SHARED, -1, (size_t)0); 
 
 
     rstatus_t status;
@@ -1646,97 +1454,6 @@ _stats_server_decr_by(struct context *ctx, struct server *server,
               stm->name.data, stm->value.counter);
 }
 
-
-
-
-//master stats 
-static struct stats_metric *
-master_stats_server_to_metric(struct context *ctx, struct stats_server *sts,
-                       stats_server_field_t fidx)
-{
-    struct stats *st;
-    //struct stats_pool *stp;
-    //struct stats_server *sts;
-    struct stats_metric *stm;
-    uint32_t pidx, sidx;
-
-    //sidx = server->idx;
-    //pidx = server->owner->idx;
-
-    st = ctx->stats;
-    //stp = array_get(&st->current, pidx);
-    //sts = array_get(&stp->server, sidx);
-    stm = array_get(&sts->metric, fidx);
-
-    st->updated = 1;
-
-    log_debug(LOG_VVVERB, "metric '%.*s' in pool %"PRIu32" server %"PRIu32"",
-              stm->name.len, stm->name.data, pidx, sidx);
-
-    return stm;
-}
-
-
-
-static void
-_master_stats_server_set_by(struct context *ctx, struct stats_server *sts,
-                      struct stats_packet *sp)
-{
-    struct stats_metric *stm;
-
-    stm = master_stats_server_to_metric(ctx, sts, sp->fidx);
-
-    ASSERT(stm->type == STATS_COUNTER || stm->type == STATS_GAUGE);
-//    log_debug(LOG_VVVERB, "incr field '%.*s' to %"PRId64" %d", stm->name.len,
-//              stm->name.data, stm->value.counter,getpid());
-
-//    log_debug(LOG_VVVERB, "incr by field '%.*s' to %"PRId64"", stm->name.len,
- //             stm->name.data, stm->value.counter);
-}
-
-
-static struct stats_metric *
-master_stats_pool_to_metric(struct context *ctx, struct stats_pool *pool,
-                     stats_pool_field_t fidx)
-{
-    struct stats *st;
-    //struct stats_pool *stp;
-    struct stats_metric *stm;
-//    uint32_t pidx;
-
-    //pidx = pool->idx;
-
-    st = ctx->stats;
-    //st = nc_processes[nc_current_process_slot].stats;
-
-//    stp = array_get(&st->current, pidx);
-    stm = array_get(&pool->metric, fidx);
-
-    st->updated = 1;
-
-    log_debug(LOG_VVVERB, "metric '%.*s' in pool %"PRIu32"", stm->name.len,
-              stm->name.data, pool);
-
-    return stm;
-}
-
-
-
-static void
-_master_stats_pool_set_by(struct context *ctx, struct stats_pool *pool,
-                   struct stats_packet *sp)
-{
-    struct stats_metric *stm;
-
-    stm = master_stats_pool_to_metric(ctx, pool, sp->fidx);
-
-    ASSERT(stm->type == STATS_COUNTER || stm->type == STATS_GAUGE);
-//    log_debug(LOG_VVVERB, "incr field '%.*s' to %"PRId64" %d", stm->name.len,
-//              stm->name.data, stm->value.counter,getpid());
-
-//    log_debug(LOG_VVVERB, "incr by field '%.*s' to %"PRId64"", stm->name.len,
- //             stm->name.data, stm->value.counter);
-}
 
 
 

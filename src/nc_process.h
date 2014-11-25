@@ -7,7 +7,6 @@ typedef struct {
     int                 status;
     int        channel[2];                                
     void               *data;   
-    struct stats       *stats;      /* stats */
     char               *name;                                      
 
 } nc_process_t;
