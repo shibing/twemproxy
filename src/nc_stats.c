@@ -28,6 +28,7 @@
 #include <nc_server.h>
 #include <nc_process.h>
 #include <sys/mman.h>
+#include <nc_string.h>
 
 struct stats_desc {
     char *name; /* stats name */
@@ -676,9 +677,12 @@ stats_aggregate_all(struct stats *st)
     struct stats_metric *stm; 
     struct stats_server *sts;
     for(i=0;i<NC_PROCESSES;++i){
+         log_error("i======%d",i);
          for(j=0;j<(STATS_POOL_NFIELD + STATS_SERVER_NFIELD);++j){ 
             struct stats_packet * sp = child_stats + i*(STATS_POOL_NFIELD + STATS_SERVER_NFIELD) + j;
-            log_error("sp=%p,i=%d,j=%d,stat_packet pidx=%d,sidx=%d,fidx=%d,value=%d,type=%d",sp,i,j,sp->pidx,sp->sidx,sp->fidx,sp->value.counter,sp->type);
+            if (sp->sidx==0 && sp->fidx==4 &&sp->type==1){
+                log_error("sp=%p,i=%d,j=%d,stat_packet pidx=%d,sidx=%d,fidx=%d,value=%d,type=%d",sp,i,j,sp->pidx,sp->sidx,sp->fidx,sp->value.counter,sp->type);
+            }
 
             if(array_n(&st->sum) <= sp->pidx){
                 break;
@@ -733,10 +737,13 @@ print_metric(struct array *metric)
     rstatus_t status;
     uint32_t i;
 
+    struct string s = string("requests");
     for (i = 0; i < array_n(metric); i++) {
         struct stats_metric *stm = array_get(metric, i);
 
-        log_error("print metric name=%.*s value=%d",stm->name.len,stm->name.data,stm->value.counter);
+        if(string_compare(&stm->name,&s)==0){
+            log_error("pid=%d, print metric name=%.*s value=%d",getpid(),stm->name.len,stm->name.data,stm->value.counter);
+        }
     }
 
     return NC_OK;
@@ -754,7 +761,7 @@ void print_stats(struct stats *st){
         for (j = 0; j < array_n(&stp->server); j++) {
             struct stats_server *sts = array_get(&stp->server, j);
 
-            print_metric(&stp->metric);
+            print_metric(&sts->metric);
         }
 
     }
@@ -767,7 +774,7 @@ stats_aggregate(struct stats *st)
     uint32_t i;
 
     if (st->aggregate == 0) {
-        log_error( "skip aggregate of shadow %p to sum %p as "
+        log_debug(LOG_PVERB, "skip aggregate of shadow %p to sum %p as "
                   "generator is slow", st->shadow, st->sum);
         return;
     }
@@ -1156,7 +1163,7 @@ void stats_child_data(struct stats *st){
 
             for (k = 0; k < array_n(&sts->metric); k++) {
                 struct stats_metric *stm = array_get(&sts->metric, k);
-                struct stats_packet * sp = child_stats + nc_current_process_slot + total ;//sharray_push(&child_stats[nc_current_process_slot]);
+                struct stats_packet * sp = child_stats + nc_current_process_slot*(STATS_POOL_NFIELD+STATS_SERVER_NFIELD) + total ;//sharray_push(&child_stats[nc_current_process_slot]);
                 sp->type = 1;
                 sp->pidx = i;
                 sp->sidx = j;
@@ -1188,15 +1195,12 @@ stats_child_loop(void *arg)
 
     for (;;) {
         //TODO send aggregate message here
-        log_error("need send aggregate message here");
 
-        if (ctx->stats){        
-            stats_aggregate(ctx->stats);
-            stats_child_data(ctx->stats);
-            //print_stats(nc_processes[nc_current_process_slot].stats);
-        } else {
-            log_error("child process stats none");
-        }
+        log_debug(LOG_PVERB,"need send aggregate message here");
+
+        stats_aggregate(ctx->stats);
+        print_stats(ctx->stats);
+        stats_child_data(ctx->stats);
         /* send aggregate stats sum (c) to master */
         //stats_send_master(ctx);
 

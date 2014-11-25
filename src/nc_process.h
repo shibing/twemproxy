@@ -12,7 +12,7 @@ typedef struct {
 
 } nc_process_t;
 
-#define NC_PROCESSES         1
+#define NC_PROCESSES         8
 #define NC_MAX_PROCESSES         1024
 nc_process_t    *nc_processes;
 extern int nc_current_process_slot;
