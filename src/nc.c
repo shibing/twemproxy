@@ -26,6 +26,7 @@
 #include <nc_core.h>
 #include <nc_conf.h>
 #include <nc_signal.h>
+#include <nc_process.h>
 
 #define NC_CONF_PATH        "conf/nutcracker.yml"
 
@@ -64,10 +65,11 @@ static struct option long_options[] = {
     { "stats-addr",     required_argument,  NULL,   'a' },
     { "pid-file",       required_argument,  NULL,   'p' },
     { "mbuf-size",      required_argument,  NULL,   'm' },
+    { "cpus",      required_argument,  NULL,   'C' },
     { NULL,             0,                  NULL,    0  }
 };
 
-static char short_options[] = "hVtdDv:o:c:s:i:a:p:m:";
+static char short_options[] = "hVtdDv:o:c:s:i:a:p:m:C:";
 
 static rstatus_t
 nc_daemonize(int dump_core)
@@ -211,13 +213,16 @@ nc_show_usage(void)
         "  -i, --stats-interval=N : set stats aggregation interval in msec (default: %d msec)" CRLF
         "  -p, --pid-file=S       : set pid file (default: %s)" CRLF
         "  -m, --mbuf-size=N      : set size of mbuf chunk in bytes (default: %d bytes)" CRLF
+        "  -C, --cpus=N           : set cpu number of your server (default: %d)" CRLF
         "",
         NC_LOG_DEFAULT, NC_LOG_MIN, NC_LOG_MAX,
         NC_LOG_PATH != NULL ? NC_LOG_PATH : "stderr",
         NC_CONF_PATH,
         NC_STATS_PORT, NC_STATS_ADDR, NC_STATS_INTERVAL,
         NC_PID_FILE != NULL ? NC_PID_FILE : "off",
-        NC_MBUF_SIZE);
+        NC_MBUF_SIZE,
+        NC_PROCESSES
+        );
 }
 
 static rstatus_t
@@ -276,6 +281,8 @@ nc_set_default_options(struct instance *nci)
     nci->stats_port = NC_STATS_PORT;
     nci->stats_addr = NC_STATS_ADDR;
     nci->stats_interval = NC_STATS_INTERVAL;
+
+    nci->cpu_num = NC_PROCESSES;
 
     status = nc_gethostname(nci->hostname, NC_MAXHOSTNAMELEN);
     if (status < 0) {
@@ -393,6 +400,23 @@ nc_get_options(int argc, char **argv, struct instance *nci)
 
             nci->mbuf_chunk_size = (size_t)value;
             break;
+
+        case 'C':
+            value = nc_atoi(optarg, strlen(optarg));
+            if (value <= 0) {
+                log_stderr("nutcracker: option -C requires a non-zero number");
+                return NC_ERROR;
+            }
+
+            if (value > NC_MAX_PROCESSES ) {
+                log_stderr("nutcracker: cpus must be smaller than %d"
+                                , NC_MAX_PROCESSES);
+                return NC_ERROR;
+            }
+
+            nci->cpu_num = (uint8_t)value;
+            break;
+
 
         case '?':
             switch (optopt) {
@@ -516,12 +540,6 @@ nc_run(struct instance *nci)
 
     /* run rabbit run */
     for (;;) {
-        //status = core_loop(ctx);
-        //if (status != NC_OK) {
-        //    break;
-        //}
-        //TODO just sleep now
-        //later will process some signal here
         sleep(10);
     }
 

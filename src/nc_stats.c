@@ -664,13 +664,14 @@ stats_aggregate_metric(struct array *dst, struct array *src)
 }
 
 static void
-stats_aggregate_all(struct stats *st)
+stats_aggregate_all(struct context *ctx)//struct stats *st)
 {
     uint32_t i,j;
+    struct stats *st = ctx->stats;
     struct stats_pool *stp;
     struct stats_metric *stm; 
     struct stats_server *sts;
-    for(i=0;i<NC_PROCESSES;++i){
+    for(i=0;i<ctx->cpu_num;++i){
          for(j=0;j<(STATS_POOL_NFIELD + STATS_SERVER_NFIELD);++j){ 
             struct stats_packet * sp = child_stats + i*(STATS_POOL_NFIELD + STATS_SERVER_NFIELD) + j;
             log_error("sp=%p,i=%d,j=%d,stat_packet pidx=%d,sidx=%d,fidx=%d,value=%d,type=%d",sp,i,j,sp->pidx,sp->sidx,sp->fidx,sp->value.counter,sp->type);
@@ -892,7 +893,6 @@ stats_loop(void *arg)
     struct stats *st = ctx->stats;
     int n;
     int i;
-    int j;
 
     for (;;) {
         struct epoll_event events[1024];
@@ -912,26 +912,12 @@ stats_loop(void *arg)
                 /* aggregate stats from shadow (b) -> sum (c) */
                 st->event = events[i];
 
-                stats_aggregate_all(st);
+                stats_aggregate_all(ctx);
         
                 /* send aggregate stats sum (c) to collector */
                 stats_send_rsp(st);
 
-            } else { //if( events[i].data.fd == ctx->channel[0] && events[i].events&EPOLLIN ){
-                for(j = 0;j<NC_MAX_PROCESSES;++j){
-                    if (nc_processes[j].channel[0] == events[i].data.fd){
-                        break;
-                    }
-                }
-                if (j>=NC_MAX_PROCESSES){
-                    log_error("not find sd in process");
-                }
-
-                //receive_message(ctx,events[i].data.fd,j);        
-                log_error("channel 0 come in"); 
-        
-            }
-
+            } 
             //log_error("event coming in %p",events[i].data.fd);
 
             
@@ -1138,7 +1124,7 @@ stats_create(struct context *ctx,uint16_t stats_port, char *stats_ip, int stats_
              char *source, struct array *server_pool)
 {
 
-    child_stats = (struct stats_packet *) mmap(NULL, sizeof(struct stats_packet) * (STATS_POOL_NFIELD + STATS_SERVER_NFIELD)*NC_PROCESSES,
+    child_stats = (struct stats_packet *) mmap(NULL, sizeof(struct stats_packet) * (STATS_POOL_NFIELD + STATS_SERVER_NFIELD)*ctx->cpu_num,
                                 PROT_READ|PROT_WRITE,
                                 MAP_ANON|MAP_SHARED, -1, (size_t)0); 
 

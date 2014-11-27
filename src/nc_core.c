@@ -47,6 +47,8 @@ core_ctx_create(struct instance *nci)
     ctx->ep = -1;
     ctx->nevent = EVENT_SIZE_HINT;
     ctx->max_timeout = nci->stats_interval;
+    ctx->cpu_num = nci->cpu_num;
+
     ctx->timeout = ctx->max_timeout;
     ctx->event = NULL;
 
@@ -117,10 +119,8 @@ core_ctx_create(struct instance *nci)
     pid_t pid; 
     int i = 0;
     //TODO need change 8 to MARCRO
-    for(i =0; i< NC_PROCESSES; ++i){
+    for(i =0; i< ctx->cpu_num; ++i){
         //create socket pair
-        //TODO check whether child can send message to master
-        //TODO move these codes to function
         if(socketpair(AF_UNIX, SOCK_STREAM, 0, nc_processes[i].channel) == -1){
             log_error("[master] sockpair create domain socket failed");
         }

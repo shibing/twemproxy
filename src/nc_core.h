@@ -108,6 +108,8 @@ struct context {
     int                timeout;     /* epoll wait timeout in msec */
     struct epoll_event *event;      /* epoll event */
     int channel[2];                /* socket pair */
+    uint8_t cpu_num;                /* number of cpus */
+
 };
 
 struct instance {
@@ -123,6 +125,7 @@ struct instance {
     pid_t           pid;                         /* process id */
     char            *pid_filename;               /* pid filename */
     unsigned        pidfile:1;                   /* pid file created? */
+    uint8_t         cpu_num;                     /* number of cpus */
 };
 
 struct context *core_start(struct instance *nci);
