@@ -149,7 +149,6 @@ core_ctx_create(struct instance *nci)
 
     log_debug(LOG_VVERB, "created ctx %p id %"PRIu32"", ctx, ctx->id);
 
-
     pid_t pid; 
     int i = 0;
     for(i =0; i< ctx->worker_num; ++i){
@@ -165,7 +164,6 @@ core_ctx_create(struct instance *nci)
            break;
 
        default:
-           /* parent terminates */
            break;
        }
 
@@ -270,7 +268,7 @@ core_close(struct context *ctx, struct conn *conn)
               conn->eof, conn->done, conn->recv_bytes, conn->send_bytes,
               conn->err ? ':' : ' ', conn->err ? strerror(conn->err) : "");
 
-    status = event_del_conn(ctx->evb, conn);
+    status = event_del_conn(ctx->processes[ctx->current_process_slot].evb, conn);
     if (status < 0) {
         log_warn("event del conn %c %d failed, ignored: %s",
                  type, conn->sd, strerror(errno));
@@ -383,7 +381,8 @@ core_loop(struct context *ctx)
 {
     int nsd;
 
-    nsd = event_wait(ctx->evb, ctx->timeout);
+    struct nc_process *process = &ctx->processes[ctx->current_process_slot];
+    nsd = event_wait(process->evb, ctx->timeout);
     if (nsd < 0) {
         return nsd;
     }

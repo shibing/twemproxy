@@ -354,7 +354,7 @@ proxy_accept(struct context *ctx, struct conn *p)
         }
     }
 
-    status = event_add_conn(ctx->evb, c);
+    status = event_add_conn(ctx->processes[ctx->current_process_slot].evb, c);
     if (status < 0) {
         log_error("event add conn from p %d failed: %s", p->sd,
                   strerror(errno));

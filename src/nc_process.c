@@ -39,6 +39,7 @@ static rstatus_t proxy_each_add_conn(void *elem, void *data)
 
 static void nc_process_init(struct context *ctx){
     int status;
+    log_error("process init %d",ctx->current_process_slot);
     struct nc_process *process = &ctx->processes[ctx->current_process_slot];
 
     process->evb = event_base_create(EVENT_SIZE, core_core);
@@ -77,7 +78,6 @@ process_loop(struct context *ctx,int process_index)
     nc_process_init(ctx);
 
     stats_start_child_aggregator(ctx);
-    log_error("spawn process process_id = %d ", getpid());
 
     for(;;){
         core_loop(ctx); 

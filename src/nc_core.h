@@ -136,7 +136,12 @@ struct context {
     struct nc_process      *processes;           /* all process in the current enviroment */
     int8_t                current_process_slot; /*current process slot*/  
     uint8_t worker_num;                          /* number of cpus */
-    
+   
+    struct stats_packet    *child_stats;         /* all child stats data */
+
+    uint32_t               npool;                /* number of poll */
+    uint32_t               nserver;              /* number of server */
+
 
 };
 

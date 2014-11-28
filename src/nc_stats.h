@@ -140,8 +140,6 @@ struct stats_packet {
     } value;
 };
 
-//TODO maybe move this to context
-struct stats_packet *child_stats;
 
 #undef DEFINE_ACTION
 

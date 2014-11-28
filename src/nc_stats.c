@@ -707,8 +707,8 @@ stats_aggregate_all(struct context *ctx)
     struct stats_server *sts;
 
     for(i=0;i<ctx->worker_num;++i){
-         for(j=0;j<(STATS_POOL_NFIELD + STATS_SERVER_NFIELD);++j){ 
-            struct stats_packet * sp = child_stats + i*(STATS_POOL_NFIELD + STATS_SERVER_NFIELD) + j;
+         for(j=0;j<(STATS_POOL_NFIELD + STATS_SERVER_NFIELD)*ctx->npool*ctx->nserver;++j){ 
+            struct stats_packet * sp = ctx->child_stats + i*(STATS_POOL_NFIELD + STATS_SERVER_NFIELD)*ctx->npool*ctx->nserver + j;
             //log_error("sp=%p,i=%d,j=%d,stat_packet pidx=%d,sidx=%d,fidx=%d,value=%d,type=%d",sp,i,j,sp->pidx,sp->sidx,sp->fidx,sp->value.counter,sp->type);
             log_debug(LOG_PVERB,"sp=%p,i=%d,j=%d,stat_packet pidx=%d,sidx=%d,fidx=%d,value=%d,type=%d",sp,i,j,sp->pidx,sp->sidx,sp->fidx,sp->value.counter,sp->type);
 
@@ -962,7 +962,7 @@ stats_create(struct context *ctx, uint16_t stats_port, char *stats_ip, int stats
     rstatus_t status;
     struct stats *st;
 
-    child_stats = (struct stats_packet *) mmap(NULL, sizeof(struct stats_packet) * (STATS_POOL_NFIELD + STATS_SERVER_NFIELD)*ctx->worker_num,
+    ctx->child_stats = (struct stats_packet *) mmap(NULL, sizeof(struct stats_packet) * (STATS_POOL_NFIELD + STATS_SERVER_NFIELD)*ctx->worker_num*ctx->npool*ctx->nserver,
                                 PROT_READ|PROT_WRITE,
                                 MAP_ANON|MAP_SHARED, -1, (size_t)0); 
 
@@ -1029,13 +1029,11 @@ stats_create(struct context *ctx, uint16_t stats_port, char *stats_ip, int stats
         goto error;
     }
 
-    if(ctx->current_process_slot==-1) {
         ctx->stats = st;
         status = stats_start_aggregator(ctx);
         if (status != NC_OK) {
             goto error;
         }
-    }
 
     return st;
 
@@ -1227,7 +1225,7 @@ static void stats_child_data(struct context *ctx)
 
         for (j = 0; j < array_n(&stp->metric); j++) {
             struct stats_metric *stm = array_get(&stp->metric, j);
-            struct stats_packet * sp = child_stats + ctx->current_process_slot*(STATS_POOL_NFIELD+STATS_SERVER_NFIELD) + total;
+            struct stats_packet * sp = ctx->child_stats + ctx->current_process_slot*(STATS_POOL_NFIELD+STATS_SERVER_NFIELD)*ctx->npool*ctx->nserver + total;
             sp->type = 0;
             sp->pidx = i;
             sp->fidx = j;
@@ -1244,7 +1242,7 @@ static void stats_child_data(struct context *ctx)
 
             for (k = 0; k < array_n(&sts->metric); k++) {
                 struct stats_metric *stm = array_get(&sts->metric, k);
-                struct stats_packet * sp = child_stats + ctx->current_process_slot*(STATS_POOL_NFIELD+STATS_SERVER_NFIELD) + total ; 
+                struct stats_packet * sp = ctx->child_stats + ctx->current_process_slot*(STATS_POOL_NFIELD+STATS_SERVER_NFIELD)*ctx->npool*ctx->nserver + total ; 
                 sp->type = 1;
                 sp->pidx = i;
                 sp->sidx = j;

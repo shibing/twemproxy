@@ -373,7 +373,7 @@ server_close(struct context *ctx, struct conn *conn)
             }
 
             if (req_done(c_conn, TAILQ_FIRST(&c_conn->omsg_q))) {
-                event_add_out(ctx->evb, msg->owner);
+                event_add_out(ctx->processes[ctx->current_process_slot].evb, msg->owner);
             }
 
             log_debug(LOG_INFO, "close s %d schedule error for req %"PRIu64" "
@@ -406,7 +406,7 @@ server_close(struct context *ctx, struct conn *conn)
             }
 
             if (req_done(c_conn, TAILQ_FIRST(&c_conn->omsg_q))) {
-                event_add_out(ctx->evb, msg->owner);
+                event_add_out(ctx->processes[ctx->current_process_slot].evb, msg->owner);
             }
 
             log_debug(LOG_INFO, "close s %d schedule error for req %"PRIu64" "
@@ -485,7 +485,7 @@ server_connect(struct context *ctx, struct server *server, struct conn *conn)
         }
     }
 
-    status = event_add_conn(ctx->evb, conn);
+    status = event_add_conn(ctx->processes[ctx->current_process_slot].evb, conn);
     if (status != NC_OK) {
         log_error("event add conn s %d for server '%.*s' failed: %s",
                   conn->sd, server->pname.len, server->pname.data,
@@ -825,7 +825,10 @@ server_pool_init(struct array *server_pool, struct array *conf_pool,
                  struct context *ctx)
 {
     rstatus_t status;
-    uint32_t npool;
+    uint32_t npool,nserver,i;
+    struct server_pool *sp; 
+
+    nserver = 0;
 
     npool = array_n(conf_pool);
     ASSERT(npool != 0);
@@ -867,6 +870,19 @@ server_pool_init(struct array *server_pool, struct array *conf_pool,
     }
 
     log_debug(LOG_DEBUG, "init %"PRIu32" pools", npool);
+
+    
+    ctx->npool = npool;
+
+   
+    for (i = 0, npool = array_n(server_pool); i < npool; i++) {
+        sp = array_get(server_pool,i);
+        nserver += array_n(&sp->server);
+    }
+
+    ctx->nserver = nserver;
+   
+    log_debug(LOG_DEBUG,"ctx.npool %d, ctx.nserver %d",ctx->npool,ctx->nserver); 
 
     return NC_OK;
 }

@@ -297,7 +297,8 @@ event_wait(struct event_base *evb, int timeout)
 void
 event_loop_stats(event_stats_cb_t cb, void *arg)
 {
-    struct stats *st = arg;
+    struct context *ctx = arg;
+    struct stats *st = ctx->stats;
     int status, ep;
     struct epoll_event ev;
 
@@ -331,7 +332,7 @@ event_loop_stats(event_stats_cb_t cb, void *arg)
             break;
         }
 
-        cb(st, &n);
+        cb(ctx, &n);
     }
 
 error:
