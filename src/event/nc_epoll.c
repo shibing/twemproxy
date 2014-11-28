@@ -321,6 +321,7 @@ event_loop_stats(event_stats_cb_t cb, void *arg)
         int n;
 
         n = epoll_wait(ep, &ev, 1, st->interval);
+
         if (n < 0) {
             if (errno == EINTR) {
                 continue;

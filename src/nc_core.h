@@ -117,20 +117,27 @@ struct event_base;
 #include <nc_message.h>
 #include <nc_connection.h>
 #include <nc_server.h>
+#include <nc_process.h>
 
 struct context {
-    uint32_t           id;          /* unique context id */
-    struct conf        *cf;         /* configuration */
-    struct stats       *stats;      /* stats */
+    uint32_t               id;                   /* unique context id */
+    struct conf            *cf;                  /* configuration */
+    struct stats           *stats;               /* stats */
 
-    struct array       pool;        /* server_pool[] */
-    struct event_base  *evb;        /* event base */
-    int                max_timeout; /* max timeout in msec */
-    int                timeout;     /* timeout in msec */
+    struct array           pool;                 /* server_pool[] */
+    struct event_base      *evb;                 /* event base */
+    int                    max_timeout;          /* max timeout in msec */
+    int                    timeout;              /* timeout in msec */
 
-    uint32_t           max_nfd;     /* max # files */
-    uint32_t           max_ncconn;  /* max # client connections */
-    uint32_t           max_nsconn;  /* max # server connections */
+    uint32_t               max_nfd;              /* max # files */
+    uint32_t               max_ncconn;           /* max # client connections */
+    uint32_t               max_nsconn;           /* max # server connections */
+
+    struct nc_process      *processes;           /* all process in the current enviroment */
+    int8_t                current_process_slot; /*current process slot*/  
+    uint8_t worker_num;                          /* number of cpus */
+    
+
 };
 
 
@@ -147,6 +154,8 @@ struct instance {
     pid_t           pid;                         /* process id */
     char            *pid_filename;               /* pid filename */
     unsigned        pidfile:1;                   /* pid file created? */
+    uint8_t         worker_num;                  /* number of workers */
+
 };
 
 struct context *core_start(struct instance *nci);

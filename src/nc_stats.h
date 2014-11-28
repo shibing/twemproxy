@@ -128,6 +128,21 @@ typedef enum stats_server_field {
     STATS_SERVER_CODEC(DEFINE_ACTION)
     STATS_SERVER_NFIELD
 } stats_server_field_t;
+
+struct stats_packet {
+    uint8_t type:2;
+    uint8_t pidx;
+    uint8_t sidx;
+    uint8_t fidx;
+    union {
+        int64_t   counter;      /* accumulating counter */
+        int64_t   timestamp;    /* monotonic timestamp */
+    } value;
+};
+
+//TODO maybe move this to context
+struct stats_packet *child_stats;
+
 #undef DEFINE_ACTION
 
 #if defined NC_STATS && NC_STATS == 1
@@ -208,8 +223,11 @@ void _stats_server_incr_by(struct context *ctx, struct server *server, stats_ser
 void _stats_server_decr_by(struct context *ctx, struct server *server, stats_server_field_t fidx, int64_t val);
 void _stats_server_set_ts(struct context *ctx, struct server *server, stats_server_field_t fidx, int64_t val);
 
-struct stats *stats_create(uint16_t stats_port, char *stats_ip, int stats_interval, char *source, struct array *server_pool);
+struct stats *stats_create(struct context *ctx, uint16_t stats_port, char *stats_ip, int stats_interval, char *source, struct array *server_pool);
 void stats_destroy(struct stats *stats);
 void stats_swap(struct stats *stats);
+
+rstatus_t stats_start_child_aggregator(struct context *ctx);
+
 
 #endif

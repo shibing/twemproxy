@@ -21,6 +21,7 @@
 #include <nc_conf.h>
 #include <nc_server.h>
 #include <nc_proxy.h>
+#include <sys/mman.h>
 
 static uint32_t ctx_id; /* context generation */
 
@@ -66,6 +67,8 @@ core_ctx_create(struct instance *nci)
     ctx->max_ncconn = 0;
     ctx->max_nsconn = 0;
 
+    ctx->worker_num = nci->worker_num;
+
     /* parse and create configuration */
     ctx->cf = conf_create(nci->conf_filename);
     if (ctx->cf == NULL) {
@@ -94,7 +97,7 @@ core_ctx_create(struct instance *nci)
     }
 
     /* create stats per server pool */
-    ctx->stats = stats_create(nci->stats_port, nci->stats_addr, nci->stats_interval,
+    ctx->stats = stats_create(ctx, nci->stats_port, nci->stats_addr, nci->stats_interval,
                               nci->hostname, &ctx->pool);
     if (ctx->stats == NULL) {
         server_pool_deinit(&ctx->pool);
@@ -114,7 +117,7 @@ core_ctx_create(struct instance *nci)
     }
 
     /* preconnect? servers in server pool */
-    status = server_pool_preconnect(ctx);
+    /*status = server_pool_preconnect(ctx);
     if (status != NC_OK) {
         server_pool_disconnect(ctx);
         event_base_destroy(ctx->evb);
@@ -123,7 +126,8 @@ core_ctx_create(struct instance *nci)
         conf_destroy(ctx->cf);
         nc_free(ctx);
         return NULL;
-    }
+    }*/
+
 
     /* initialize proxy per server pool */
     status = proxy_init(ctx);
@@ -137,7 +141,35 @@ core_ctx_create(struct instance *nci)
         return NULL;
     }
 
+    ctx->current_process_slot = -1;
+    ctx->processes = (struct nc_process *) mmap(NULL, ctx->worker_num * sizeof(struct nc_process),
+                                PROT_READ|PROT_WRITE,
+                                MAP_ANON|MAP_SHARED, -1, (size_t)0); 
+
+
     log_debug(LOG_VVERB, "created ctx %p id %"PRIu32"", ctx, ctx->id);
+
+
+    pid_t pid; 
+    int i = 0;
+    for(i =0; i< ctx->worker_num; ++i){
+       pid = fork();
+       switch (pid) {
+       case -1:
+           log_error("fork() failed: %s", strerror(errno));
+           return NULL;
+
+       case 0:
+           process_loop(ctx,i);
+           exit(1);
+           break;
+
+       default:
+           /* parent terminates */
+           break;
+       }
+
+    } 
 
     return ctx;
 }
@@ -152,6 +184,7 @@ core_ctx_destroy(struct context *ctx)
     stats_destroy(ctx->stats);
     server_pool_deinit(&ctx->pool);
     conf_destroy(ctx->cf);
+    munmap(ctx->processes, ctx->worker_num * sizeof(struct nc_process));
     nc_free(ctx);
 }
 
@@ -169,6 +202,7 @@ core_start(struct instance *nci)
         nci->ctx = ctx;
         return ctx;
     }
+
 
     conn_deinit();
     msg_deinit();

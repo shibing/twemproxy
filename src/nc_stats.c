@@ -22,9 +22,11 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <sys/mman.h>
 
 #include <nc_core.h>
 #include <nc_server.h>
+
 
 struct stats_desc {
     char *name; /* stats name */
@@ -695,6 +697,68 @@ stats_aggregate(struct stats *st)
     st->aggregate = 0;
 }
 
+static void
+stats_aggregate_all(struct context *ctx)
+{
+    uint32_t i,j;
+    struct stats *st = ctx->stats;
+    struct stats_pool *stp;
+    struct stats_metric *stm; 
+    struct stats_server *sts;
+
+    for(i=0;i<ctx->worker_num;++i){
+         for(j=0;j<(STATS_POOL_NFIELD + STATS_SERVER_NFIELD);++j){ 
+            struct stats_packet * sp = child_stats + i*(STATS_POOL_NFIELD + STATS_SERVER_NFIELD) + j;
+            //log_error("sp=%p,i=%d,j=%d,stat_packet pidx=%d,sidx=%d,fidx=%d,value=%d,type=%d",sp,i,j,sp->pidx,sp->sidx,sp->fidx,sp->value.counter,sp->type);
+            log_debug(LOG_PVERB,"sp=%p,i=%d,j=%d,stat_packet pidx=%d,sidx=%d,fidx=%d,value=%d,type=%d",sp,i,j,sp->pidx,sp->sidx,sp->fidx,sp->value.counter,sp->type);
+
+            if(array_n(&st->sum) <= sp->pidx){
+                break;
+            }
+
+            stp =array_get(&st->sum,sp->pidx);
+            if (sp->type==0){
+                if(array_n(&stp->metric) <= sp->fidx){
+                    break;
+                }
+
+                stm = array_get(&stp->metric, sp->fidx);
+                if(i==0){
+                    stm->value.counter = sp->value.counter;
+                } else {
+                    stm->value.counter += sp->value.counter;
+                }
+            } 
+            if (sp->type==1){
+                if(array_n(&stp->server) <= sp->sidx){
+                    break;
+                }
+
+                sts = array_get(&stp->server, sp->sidx);
+
+                if(array_n(&sts->metric) <= sp->fidx){
+                    break;
+                }
+
+                stm = array_get(&sts->metric, sp->fidx);
+                if(i==0){
+                    stm->value.counter = sp->value.counter;
+                } else {
+                    stm->value.counter += sp->value.counter;
+                }
+            }
+
+            if (sp->type==2){
+                break;
+            }
+             
+         }
+        
+
+    }    
+}
+
+
 static rstatus_t
 stats_make_rsp(struct stats *st)
 {
@@ -790,11 +854,12 @@ stats_send_rsp(struct stats *st)
 static void
 stats_loop_callback(void *arg1, void *arg2)
 {
-    struct stats *st = arg1;
+    struct context *ctx = arg1;
+    struct stats *st = ctx->stats;
     int n = *((int *)arg2);
 
     /* aggregate stats from shadow (b) -> sum (c) */
-    stats_aggregate(st);
+    stats_aggregate_all(ctx);
 
     if (n == 0) {
         return;
@@ -854,9 +919,13 @@ stats_listen(struct stats *st)
 }
 
 static rstatus_t
-stats_start_aggregator(struct stats *st)
+stats_start_aggregator(struct context *ctx)
 {
+
+    struct stats *st;
     rstatus_t status;
+
+    st = ctx->stats;
 
     if (!stats_enabled) {
         return NC_OK;
@@ -867,7 +936,7 @@ stats_start_aggregator(struct stats *st)
         return status;
     }
 
-    status = pthread_create(&st->tid, NULL, stats_loop, st);
+    status = pthread_create(&st->tid, NULL, stats_loop, ctx);
     if (status < 0) {
         log_error("stats aggregator create failed: %s", strerror(status));
         return NC_ERROR;
@@ -887,11 +956,16 @@ stats_stop_aggregator(struct stats *st)
 }
 
 struct stats *
-stats_create(uint16_t stats_port, char *stats_ip, int stats_interval,
+stats_create(struct context *ctx, uint16_t stats_port, char *stats_ip, int stats_interval,
              char *source, struct array *server_pool)
 {
     rstatus_t status;
     struct stats *st;
+
+    child_stats = (struct stats_packet *) mmap(NULL, sizeof(struct stats_packet) * (STATS_POOL_NFIELD + STATS_SERVER_NFIELD)*ctx->worker_num,
+                                PROT_READ|PROT_WRITE,
+                                MAP_ANON|MAP_SHARED, -1, (size_t)0); 
+
 
     st = nc_alloc(sizeof(*st));
     if (st == NULL) {
@@ -955,9 +1029,12 @@ stats_create(uint16_t stats_port, char *stats_ip, int stats_interval,
         goto error;
     }
 
-    status = stats_start_aggregator(st);
-    if (status != NC_OK) {
-        goto error;
+    if(ctx->current_process_slot==-1) {
+        ctx->stats = st;
+        status = stats_start_aggregator(ctx);
+        if (status != NC_OK) {
+            goto error;
+        }
     }
 
     return st;
@@ -1136,6 +1213,104 @@ stats_server_to_metric(struct context *ctx, struct server *server,
     return stm;
 }
 
+static void stats_child_data(struct context *ctx)
+{
+    uint32_t i,j,k;
+    struct stats *st;
+    int total;
+
+    total = 0;
+    st = ctx->stats;
+
+    for (i = 0; i < array_n(&st->sum); i++) {
+        struct stats_pool *stp = array_get(&st->sum, i);
+
+        for (j = 0; j < array_n(&stp->metric); j++) {
+            struct stats_metric *stm = array_get(&stp->metric, j);
+            struct stats_packet * sp = child_stats + ctx->current_process_slot*(STATS_POOL_NFIELD+STATS_SERVER_NFIELD) + total;
+            sp->type = 0;
+            sp->pidx = i;
+            sp->fidx = j;
+            sp->value.timestamp = stm->value.timestamp;
+            sp->value.counter = stm->value.counter;
+
+            total++;
+
+        }
+
+
+        for (j = 0; j < array_n(&stp->server); j++) {
+            struct stats_server *sts = array_get(&stp->server, j);
+
+            for (k = 0; k < array_n(&sts->metric); k++) {
+                struct stats_metric *stm = array_get(&sts->metric, k);
+                struct stats_packet * sp = child_stats + ctx->current_process_slot*(STATS_POOL_NFIELD+STATS_SERVER_NFIELD) + total ; 
+                sp->type = 1;
+                sp->pidx = i;
+                sp->sidx = j;
+                sp->fidx = k;
+                sp->value.timestamp = stm->value.timestamp;
+                sp->value.counter = stm->value.counter;
+                total++;
+
+            }
+
+        }
+
+    }
+
+
+}
+
+static void
+print_metric(struct array *metric)
+{
+    uint32_t i;
+
+    struct string s = string("requests");
+    for (i = 0; i < array_n(metric); i++) {
+        struct stats_metric *stm = array_get(metric, i);
+
+        if(string_compare(&stm->name,&s)==0){
+            log_error("pid=%d, print metric name=%.*s value=%d",getpid(),stm->name.len,stm->name.data,stm->value.counter);
+        }
+    }
+
+}
+
+static void print_stats(struct stats *st){
+    uint32_t i;
+    for (i = 0; i < array_n(&st->sum); i++) {
+        struct stats_pool *stp = array_get(&st->sum, i);
+        uint32_t j;
+
+        /* copy pool metric from sum(c) to buffer */
+        print_metric(&stp->metric);
+
+        for (j = 0; j < array_n(&stp->server); j++) {
+            struct stats_server *sts = array_get(&stp->server, j);
+
+            print_metric(&sts->metric);
+        }
+
+    }
+
+}
+
+static void *
+stats_child_loop(void *arg)
+{
+    struct context *ctx = arg;
+
+    for (;;) {
+        stats_aggregate(ctx->stats);
+        stats_child_data(ctx);
+        sleep(1);
+    }
+
+}
+
+
 void
 _stats_server_incr(struct context *ctx, struct server *server,
                    stats_server_field_t fidx)
@@ -1209,4 +1384,20 @@ _stats_server_set_ts(struct context *ctx, struct server *server,
 
     log_debug(LOG_VVVERB, "set ts field '%.*s' to %"PRId64"", stm->name.len,
               stm->name.data, stm->value.timestamp);
+}
+
+
+
+rstatus_t
+stats_start_child_aggregator(struct context *ctx)
+{
+    rstatus_t status;
+
+    status = pthread_create(&ctx->stats->tid, NULL, stats_child_loop, ctx);
+    if (status < 0) {
+        log_error("stats child aggregator create failed: %s", strerror(status));
+        return NC_ERROR;
+    }
+
+    return NC_OK;
 }
