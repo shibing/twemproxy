@@ -537,6 +537,17 @@ nc_post_run(struct instance *nci)
     log_deinit();
 }
 
+static void 
+wait_signal(){
+    sigset_t            new_mask,   old_mask,   zero_mask;
+    struct sigaction    act;
+    sigemptyset(&zero_mask);
+    sigemptyset(&new_mask);
+
+    sigsuspend(&zero_mask);
+
+}
+
 static void
 nc_run(struct instance *nci)
 {
@@ -549,7 +560,7 @@ nc_run(struct instance *nci)
 
     /* run rabbit run */
     for (;;) {
-        sleep(10);
+        wait_signal();
     }
 
     core_stop(ctx);
