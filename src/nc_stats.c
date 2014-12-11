@@ -663,11 +663,17 @@ stats_aggregate_metric(struct array *dst, struct array *src)
     }
 }
 
+static void stats_child_data(struct context *ctx);
+
+
+
 static void
-stats_aggregate(struct stats *st)
+stats_aggregate(struct context *ctx)
 {
     uint32_t i;
+    struct stats *st;
 
+    st = ctx->stats;
     if (st->aggregate == 0) {
         log_debug(LOG_PVERB, "skip aggregate of shadow %p to sum %p as "
                   "generator is slow", st->shadow.elem, st->sum.elem);
@@ -693,6 +699,8 @@ stats_aggregate(struct stats *st)
             stats_aggregate_metric(&sts2->metric, &sts1->metric);
         }
     }
+
+    stats_child_data(ctx);
 
     st->aggregate = 0;
 }
@@ -851,6 +859,8 @@ stats_send_rsp(struct stats *st)
     return NC_OK;
 }
 
+static void print_stats(struct stats *st);
+
 static void
 stats_loop_callback(void *arg1, void *arg2)
 {
@@ -860,6 +870,8 @@ stats_loop_callback(void *arg1, void *arg2)
 
     /* aggregate stats from shadow (b) -> sum (c) */
     stats_aggregate_all(ctx);
+
+    //print_stats(ctx->stats);
 
     if (n == 0) {
         return;
@@ -1211,7 +1223,8 @@ stats_server_to_metric(struct context *ctx, struct server *server,
     return stm;
 }
 
-static void stats_child_data(struct context *ctx)
+static void 
+stats_child_data(struct context *ctx)
 {
     uint32_t i,j,k;
     struct stats *st;
@@ -1299,10 +1312,10 @@ static void *
 stats_child_loop(void *arg)
 {
     struct context *ctx = arg;
+    stats_child_data(ctx);
 
     for (;;) {
-        stats_aggregate(ctx->stats);
-        stats_child_data(ctx);
+        stats_aggregate(ctx);
         sleep(1);
     }
 
