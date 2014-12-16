@@ -65,6 +65,10 @@ static void nc_process_init(struct context *ctx){
 
     status = array_each(&ctx->pool, proxy_each_add_conn, process); 
 
+    if (pipe(process->channel) < 0 ) {
+        log_error("start pipeline error");
+    }
+
 
 }
 

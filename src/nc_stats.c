@@ -1308,15 +1308,59 @@ static void print_stats(struct stats *st){
 
 }
 
+rstatus_t
+read_channel(void *arg, uint32_t events)
+{
+    struct conn *conn = arg;
+    char buf[1];
+    read(conn->sd,buf,1);
+    log_error("conn sd=%d read=%s",conn->sd,buf);
+}
+
 static void *
 stats_child_loop(void *arg)
 {
     struct context *ctx = arg;
+    struct event_base *evb;
+    struct nc_process *process;
+    struct conn dummy_conn;
+    
+    int nsd;
+
+    rstatus_t status;
+
     stats_child_data(ctx);
 
+    evb = event_base_create(1, read_channel);
+    if (evb == NULL) {
+        log_error("create stat event_base error");
+    }
+
+    process = &ctx->processes[ctx->current_process_slot];
+
+    status = nc_set_nonblocking(process->channel[0]);
+    if (status < 0) {
+        log_error("set stat non blocking failed");
+    }
+
+    dummy_conn.sd = process->channel[0];
+
+
+    status = event_add_conn(evb, &dummy_conn);
+    if (status < 0) {
+        log_error("event add stat channel pipe failed");
+    }
+
+    
     for (;;) {
-        stats_aggregate(ctx);
-        sleep(1);
+        log_error("waiting..");
+        nsd = event_wait(evb,ctx->timeout);
+        log_error("nsd = %d",nsd);
+        if(nsd>0){
+            stats_aggregate(ctx);
+        }
+        //TODO epoll
+        //sleep(1);
     }
 
 }
