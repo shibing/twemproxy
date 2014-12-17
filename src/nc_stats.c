@@ -23,6 +23,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <sys/mman.h>
+#include <sys/time.h>
 
 #include <nc_core.h>
 #include <nc_server.h>
@@ -1326,6 +1327,7 @@ stats_child_loop(void *arg)
     struct conn dummy_conn;
     
     int nsd;
+    uint32_t s,t;
 
     rstatus_t status;
 
@@ -1351,16 +1353,24 @@ stats_child_loop(void *arg)
         log_error("event add stat channel pipe failed");
     }
 
-    
+    s = time(NULL);
+
     for (;;) {
-        log_error("waiting..");
+        t = time(NULL) - s;
+        log_debug(LOG_VVVERB,"seconds e -s = %d",t);
+        log_debug(LOG_VVVERB,"waiting..");
         nsd = event_wait(evb,ctx->timeout);
-        log_error("nsd = %d",nsd);
+        log_debug(LOG_VVVERB,"nsd = %d",nsd);
+
+        if(t<=1){
+           log_debug(LOG_VVVERB,"child stat interval too small");
+           continue; 
+        }
+
         if(nsd>0){
             stats_aggregate(ctx);
+            s = time(NULL);
         }
-        //TODO epoll
-        //sleep(1);
     }
 
 }
