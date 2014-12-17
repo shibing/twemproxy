@@ -1362,13 +1362,13 @@ stats_child_loop(void *arg)
         nsd = event_wait(evb,ctx->timeout);
         log_debug(LOG_VVVERB,"nsd = %d",nsd);
 
-        if(t<=1){
+        if(t<=0){
            log_debug(LOG_VVVERB,"child stat interval too small");
            continue; 
         }
 
         if(nsd>0){
-            stats_aggregate(ctx);
+          stats_aggregate(ctx);
             s = time(NULL);
         }
     }
