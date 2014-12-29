@@ -568,6 +568,12 @@ nc_run(struct instance *nci)
             nc_reconfigure = 0;
             log_error("need reconfigure");
             signal_processes(ctx,NC_RELOAD);
+
+            //respawn
+            int i = 0;
+            for(i =0; i< ctx->worker_num; ++i){
+                process_spawn(ctx,i);
+            } 
         }
 
     }
