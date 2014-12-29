@@ -545,6 +545,7 @@ wait_signal(){
     sigemptyset(&new_mask);
 
     sigsuspend(&zero_mask);
+    signal(SIGCHLD,SIG_IGN);
 
 }
 
@@ -560,7 +561,15 @@ nc_run(struct instance *nci)
 
     /* run rabbit run */
     for (;;) {
+        //sleep(1);
         wait_signal();
+
+        if (nc_reconfigure) {
+            nc_reconfigure = 0;
+            log_error("need reconfigure");
+            signal_processes(ctx,NC_RELOAD);
+        }
+
     }
 
     core_stop(ctx);

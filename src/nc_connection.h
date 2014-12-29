@@ -85,6 +85,8 @@ struct conn {
     unsigned           done:1;        /* done? aka close? */
     unsigned           redis:1;       /* redis? */
     unsigned           need_auth:1;   /* need_auth? */
+    unsigned           dummy:1;       /* dummy connection? */
+
 };
 
 TAILQ_HEAD(conn_tqh, conn);

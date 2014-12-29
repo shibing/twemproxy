@@ -118,6 +118,7 @@ struct event_base;
 #include <nc_connection.h>
 #include <nc_server.h>
 #include <nc_process.h>
+#include <nc_signal.h>
 
 struct context {
     uint32_t               id;                   /* unique context id */
@@ -161,6 +162,10 @@ struct instance {
     unsigned        pidfile:1;                   /* pid file created? */
     uint8_t         worker_num;                  /* number of workers */
 
+};
+
+struct nc_cmd {
+     uint8_t  command;
 };
 
 struct context *core_start(struct instance *nci);

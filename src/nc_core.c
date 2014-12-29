@@ -152,21 +152,7 @@ core_ctx_create(struct instance *nci)
     pid_t pid; 
     int i = 0;
     for(i =0; i< ctx->worker_num; ++i){
-       pid = fork();
-       switch (pid) {
-       case -1:
-           log_error("fork() failed: %s", strerror(errno));
-           return NULL;
-
-       case 0:
-           process_loop(ctx,i);
-           exit(1);
-           break;
-
-       default:
-           break;
-       }
-
+        process_spawn(ctx,i);
     } 
 
     return ctx;
@@ -343,7 +329,14 @@ core_core(void *arg, uint32_t events)
 {
     rstatus_t status;
     struct conn *conn = arg;
-    struct context *ctx = conn_to_ctx(conn);
+    struct context *ctx;
+    
+    if (conn->dummy == 1){
+        log_error("dummpy");
+        return process_read_channel(conn,events);
+    }
+
+    ctx  = conn_to_ctx(conn);
 
     log_debug(LOG_VVERB, "event %04"PRIX32" on %c %d", events,
               conn->client ? 'c' : (conn->proxy ? 'p' : 's'), conn->sd);

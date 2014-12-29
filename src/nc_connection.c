@@ -157,6 +157,7 @@ _conn_get(void)
     conn->done = 0;
     conn->redis = 0;
     conn->need_auth = 0;
+    conn->dummy = 0;
 
     ntotal_conn++;
     ncurr_conn++;

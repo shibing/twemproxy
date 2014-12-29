@@ -18,7 +18,10 @@
 #ifndef _NC_SIGNAL_H_
 #define _NC_SIGNAL_H_
 
+#define NC_RELOAD   1
+
 #include <nc_core.h>
+
 
 struct signal {
     int  signo;
