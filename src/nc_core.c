@@ -393,7 +393,8 @@ core_loop(struct context *ctx)
 
     /* notify stat thread to collect data */
     write(process->channel[1],"0",1);
-    log_error("notify to child thread");
+
+    log_debug(LOG_NOTICE,"notify to child thread");
 
     return NC_OK;
 }

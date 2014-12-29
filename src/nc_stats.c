@@ -1315,7 +1315,7 @@ read_channel(void *arg, uint32_t events)
     struct conn *conn = arg;
     char buf[1];
     read(conn->sd,buf,1);
-    log_error("conn sd=%d read=%s",conn->sd,buf);
+    log_debug(LOG_VVVERB,"conn sd=%d read=%s",conn->sd,buf);
 }
 
 static void *
