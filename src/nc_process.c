@@ -10,7 +10,12 @@
 sig_atomic_t nc_reconfigure;
 uint8_t nc_exit;
 
-static rstatus_t proxy_each_add_conn(void *elem, void *data)
+static rstatus_t print(void *elem, void *data)
+{
+  log_error("debug print pid=%d, elem=%p ...........",getpid(),elem);
+}
+
+rstatus_t proxy_each_add_conn(void *elem, void *data)
 {
     rstatus_t status;
     struct server_pool *pool = elem;
@@ -18,6 +23,8 @@ static rstatus_t proxy_each_add_conn(void *elem, void *data)
     struct nc_process *process = data;
 
     p = pool->p_conn;
+
+    log_error("proxy_each_add_con pid=%d, elem=%p ",getpid(),elem);
 
     status = event_add_conn(process->evb, p);
     if (status < 0) {
@@ -147,17 +154,18 @@ void signal_processes(struct context *ctx,uint8_t command ) {
     
 }
 
-static void nc_process_init(struct context *ctx){
+void nc_process_init(struct context *ctx){
     int status;
     log_error("process init %d",ctx->current_process_slot);
     struct nc_process *process = &ctx->processes[ctx->current_process_slot];
-    struct conn dummy_conn;
-    struct event_base *evb;
+    struct conn *dummy_conn;
 
-    process->evb = event_base_create(EVENT_SIZE, core_core);
+    //TODO need free it
+    dummy_conn = nc_alloc(sizeof(struct conn));
+
+    process->evb = event_base_create(EVENT_SIZE, &core_core);
 
 
-    status = array_each(&ctx->pool, proxy_each_add_conn, process); 
     if (pipe(process->channel) < 0 ) {
         log_error("start pipeline error");
     }
@@ -169,16 +177,27 @@ static void nc_process_init(struct context *ctx){
     }
 
     /* add event to channel 1 */
-    dummy_conn.dummy = 1;
-    dummy_conn.owner = ctx;
-    dummy_conn.sd = process->pair_channel[1];
+    dummy_conn->dummy = 1;
+    dummy_conn->owner = ctx;
+    dummy_conn->sd = process->pair_channel[1];
 
-    status = event_add_conn(process->evb, &dummy_conn);
+    status = event_add_conn(process->evb, dummy_conn);
+    if (status < 0) {
+        log_error("event add master dummy conn failed");
+    }
+
+
+    log_error("pool address=%p, pool count=%d",&ctx->pool,array_n(&ctx->pool));
+    array_each(&ctx->pool, print, NULL); 
+
+    status = array_each(&ctx->pool, proxy_each_add_conn, process); 
     if (status < 0) {
         log_error("event add stat channel pipe failed");
     }
- 
 
+
+
+    log_error("process inited %d",ctx->current_process_slot);
 
 
 
@@ -190,8 +209,9 @@ rstatus_t process_spawn(struct context *ctx, int i) {
     pid_t pid;
     struct nc_process *process = &ctx->processes[i];
 
+    log_error("processes address %p",ctx->processes);
     if (socketpair(AF_UNIX, SOCK_STREAM, 0, ctx->processes[i].pair_channel) == -1) {
-            log_error("socketpair() failed while spawn");
+            log_error("socketpair() failed while spawn %s",strerror(errno));
             return NC_ERROR;
     }
 
@@ -204,6 +224,10 @@ rstatus_t process_spawn(struct context *ctx, int i) {
     }
 
     status = nc_set_nonblocking(process->pair_channel[1]);
+    if (status < 0) {
+        log_error("pair 1 non block error");
+        return NC_ERROR;
+    }
    
     log_error("spawn socket pair %d %d",process->pair_channel[0],process->pair_channel[1]); 
     if (status < 0) {
@@ -219,6 +243,7 @@ rstatus_t process_spawn(struct context *ctx, int i) {
 
     case 0:
         process_loop(ctx,i);
+        process_deinit(ctx,i);
         _exit(0);
         break; 
     default:
@@ -231,13 +256,14 @@ rstatus_t process_spawn(struct context *ctx, int i) {
 void
 process_loop(struct context *ctx,int process_index)
 {
-    log_debug(LOG_VVERB, "spawn process process_id = %d ", getpid());
+    log_error("spawn process process_id = %d ", getpid());
     ctx->processes[process_index].pid = getpid();
 
     ctx->current_process_slot = process_index;
     nc_process_init(ctx);
 
-    //stats_start_child_aggregator(ctx);
+    //TODO ÔÝÊ±¹Ø±Õ
+    stats_start_child_aggregator(ctx);
 
     for(;;){
         core_loop(ctx); 
@@ -245,6 +271,11 @@ process_loop(struct context *ctx,int process_index)
             break;
         }
     }
+}
+
+void process_deinit(struct context *ctx,int i){
+    log_error("process deinit %d",i);
+    close(ctx->processes[i].pair_channel[1]);
 }
 
 

@@ -68,6 +68,8 @@ core_ctx_create(struct instance *nci)
     ctx->max_nsconn = 0;
 
     ctx->worker_num = nci->worker_num;
+    ctx->old_ctx = NULL;
+
 
     /* parse and create configuration */
     ctx->cf = conf_create(nci->conf_filename);
@@ -390,4 +392,106 @@ core_loop(struct context *ctx)
     log_debug(LOG_NOTICE,"notify to child thread");
 
     return NC_OK;
+}
+
+static rstatus_t print(void *elem, void *data)
+{
+  log_error("debug print pid=%d, elem=%p ...........",getpid(),elem);
+}
+
+
+struct context *
+core_ctx_update(struct context *old_ctx, struct instance *nci)
+{
+    rstatus_t   status;
+    struct context *ctx;
+
+    ctx = nc_alloc(sizeof(*ctx));
+    if (ctx == NULL) {
+        return NULL;
+    }
+    ctx->id = ++ctx_id;
+    ctx->cf = NULL;
+    ctx->stats = NULL;
+    ctx->evb = NULL;
+    array_null(&ctx->pool);
+    ctx->max_timeout = nci->stats_interval;
+    ctx->timeout = ctx->max_timeout;
+    ctx->max_nfd = 0;
+    ctx->max_ncconn = 0;
+    ctx->max_nsconn = 0;
+
+    ctx->worker_num = nci->worker_num;
+
+    ctx->old_ctx = old_ctx;
+
+    /* parse and create configuration */
+    ctx->cf = conf_create(nci->conf_filename);
+    if (ctx->cf == NULL) {
+        nc_free(ctx);
+        return NULL;
+    }
+
+    ///* initialize server pool from configuration */
+    status = server_pool_init(&ctx->pool, &ctx->cf->pool, ctx);
+    if (status != NC_OK) {
+        conf_destroy(ctx->cf);
+        nc_free(ctx);
+        log_error("server_pool_init failed");
+        return NULL;
+    }
+
+    /*
+     * Get rlimit and calculate max client connections after we have
+     * calculated max server connections
+     */
+    status = core_calc_connections(ctx);
+    if (status != NC_OK) {
+        server_pool_deinit(&ctx->pool);
+        conf_destroy(ctx->cf);
+        nc_free(ctx);
+        return NULL;
+    }
+
+    /* create stats per server pool */
+    ctx->stats = stats_create(ctx, nci->stats_port, nci->stats_addr, nci->stats_interval,
+                              nci->hostname, &ctx->pool);
+    if (ctx->stats == NULL) {
+        server_pool_deinit(&ctx->pool);
+        conf_destroy(ctx->cf);
+        nc_free(ctx);
+        return NULL;
+    }
+
+
+    ctx->evb = event_base_create(EVENT_SIZE, &core_core);
+    if (ctx->evb == NULL) {
+        stats_destroy(ctx->stats);
+        server_pool_deinit(&ctx->pool);
+        conf_destroy(ctx->cf);
+        nc_free(ctx);
+        return NULL;
+    }
+
+
+    status = proxy_init(ctx);
+    if (status != NC_OK) {
+        server_pool_disconnect(ctx);
+        event_base_destroy(ctx->evb);
+        stats_destroy(ctx->stats);
+        server_pool_deinit(&ctx->pool);
+        conf_destroy(ctx->cf);
+        nc_free(ctx);
+        return NULL;
+    }
+
+    ctx->current_process_slot = -1;
+    ctx->processes = (struct nc_process *) mmap(NULL, ctx->worker_num * sizeof(struct nc_process),
+                                PROT_READ|PROT_WRITE,
+                                MAP_ANON|MAP_SHARED, -1, (size_t)0); 
+
+
+    log_debug(LOG_VVERB, "created ctx %p id %"PRIu32"", ctx, ctx->id);
+
+    return ctx;
 }

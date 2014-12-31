@@ -719,7 +719,7 @@ stats_aggregate_all(struct context *ctx)
          for(j=0;j<(STATS_POOL_NFIELD + STATS_SERVER_NFIELD)*ctx->npool*ctx->nserver;++j){ 
             struct stats_packet * sp = ctx->child_stats + i*(STATS_POOL_NFIELD + STATS_SERVER_NFIELD)*ctx->npool*ctx->nserver + j;
             //log_error("sp=%p,i=%d,j=%d,stat_packet pidx=%d,sidx=%d,fidx=%d,value=%d,type=%d",sp,i,j,sp->pidx,sp->sidx,sp->fidx,sp->value.counter,sp->type);
-            log_debug(LOG_PVERB,"sp=%p,i=%d,j=%d,stat_packet pidx=%d,sidx=%d,fidx=%d,value=%d,type=%d",sp,i,j,sp->pidx,sp->sidx,sp->fidx,sp->value.counter,sp->type);
+            //log_debug(LOG_PVERB,"sp=%p,i=%d,j=%d,stat_packet pidx=%d,sidx=%d,fidx=%d,value=%d,type=%d",sp,i,j,sp->pidx,sp->sidx,sp->fidx,sp->value.counter,sp->type);
 
             if(array_n(&st->sum) <= sp->pidx){
                 break;
@@ -944,9 +944,15 @@ stats_start_aggregator(struct context *ctx)
         return NC_OK;
     }
 
-    status = stats_listen(st);
-    if (status != NC_OK) {
-        return status;
+    if (ctx->old_ctx == NULL) {
+        status = stats_listen(st);
+        if (status != NC_OK) {
+            return status;
+        }
+
+    } else {
+        st->sd = ctx->old_ctx->stats->sd;
+
     }
 
     status = pthread_create(&st->tid, NULL, stats_loop, ctx);

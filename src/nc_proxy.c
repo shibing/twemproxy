@@ -24,6 +24,7 @@
 void
 proxy_ref(struct conn *conn, void *owner)
 {
+    log_error("pid = %d,proxy ref conn address =%p",getpid(),conn);
     struct server_pool *pool = owner;
 
     ASSERT(!conn->client && conn->proxy);
@@ -188,6 +189,10 @@ proxy_each_init(void *elem, void *data)
     struct server_pool *pool = elem;
     struct conn *p;
 
+    if (pool->p_conn != NULL) {
+        return NC_OK;
+    }
+
     p = conn_get_proxy(pool);
     if (p == NULL) {
         return NC_ENOMEM;
@@ -208,12 +213,46 @@ proxy_each_init(void *elem, void *data)
     return NC_OK;
 }
 
+rstatus_t proxy_check_listening(void *elem, void *data)
+{
+    uint32_t   i, npool;
+    struct server_pool *pool = elem;
+    struct context  *old_ctx = data;
+
+    npool = array_n(&old_ctx->pool);
+
+    for (i = 0; i < npool; ++i) {
+        struct server_pool *old_pool = array_get(&old_ctx->pool, i);
+       
+        //TODO 需要详细判断
+        //TODO 需要更多复制
+        if (string_compare(&old_pool->addrstr, &pool->addrstr) == 0) {
+            log_error("same listening copy it");
+            pool->p_conn = old_pool->p_conn;
+            pool->p_conn->owner = pool;
+                
+        }
+
+    }
+
+    return NC_OK;
+}
+
 rstatus_t
 proxy_init(struct context *ctx)
 {
     rstatus_t status;
 
     ASSERT(array_n(&ctx->pool) != 0);
+
+    if (ctx->old_ctx != NULL) {
+        status = array_each(&ctx->pool, proxy_check_listening, ctx->old_ctx);
+        if (status != NC_OK) {
+            log_error("proxy check listening failed");
+
+        }
+    }
+
 
     status = array_each(&ctx->pool, proxy_each_init, NULL);
     if (status != NC_OK) {

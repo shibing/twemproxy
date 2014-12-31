@@ -565,10 +565,14 @@ nc_run(struct instance *nci)
         wait_signal();
 
         if (nc_reconfigure) {
+
+            pthread_cancel(ctx->stats->tid);
+
             nc_reconfigure = 0;
             log_error("need reconfigure");
             signal_processes(ctx,NC_RELOAD);
 
+            ctx = core_ctx_update(ctx, nci);
             //respawn
             int i = 0;
             for(i =0; i< ctx->worker_num; ++i){
