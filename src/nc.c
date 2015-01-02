@@ -566,7 +566,11 @@ nc_run(struct instance *nci)
 
         if (nc_reconfigure) {
 
-            pthread_cancel(ctx->stats->tid);
+            if(ctx->stats!=NULL){
+                pthread_cancel(ctx->stats->tid);
+                //avoid memory leak
+                pthread_join(ctx->stats->tid,NULL);
+            }
 
             nc_reconfigure = 0;
             log_error("need reconfigure");

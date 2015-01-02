@@ -161,8 +161,7 @@ void nc_process_init(struct context *ctx){
     struct nc_process *process = &ctx->processes[ctx->current_process_slot];
     struct conn *dummy_conn;
 
-    //TODO need free it
-    dummy_conn = nc_alloc(sizeof(struct conn));
+    dummy_conn = &process->dummy_conn;
 
     process->evb = event_base_create(EVENT_SIZE, &core_core);
 

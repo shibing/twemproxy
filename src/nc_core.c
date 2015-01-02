@@ -114,6 +114,7 @@ core_ctx_create(struct instance *nci)
         stats_destroy(ctx->stats);
         server_pool_deinit(&ctx->pool);
         conf_destroy(ctx->cf);
+
         nc_free(ctx);
         return NULL;
     }
@@ -422,14 +423,12 @@ core_ctx_update(struct context *old_ctx, struct instance *nci)
 
     ctx->old_ctx = old_ctx;
 
-    /* parse and create configuration */
     ctx->cf = conf_create(nci->conf_filename);
     if (ctx->cf == NULL) {
         nc_free(ctx);
         return NULL;
     }
 
-    ///* initialize server pool from configuration */
     status = server_pool_init(&ctx->pool, &ctx->cf->pool, ctx);
     if (status != NC_OK) {
         conf_destroy(ctx->cf);
@@ -489,6 +488,18 @@ core_ctx_update(struct context *old_ctx, struct instance *nci)
 
 
     log_debug(LOG_VVERB, "created ctx %p id %"PRIu32"", ctx, ctx->id);
+
+    //core_ctx_destroy(old_ctx);
+    ctx->old_ctx = NULL; 
+    server_pool_disconnect(old_ctx);
+    event_base_destroy(old_ctx->evb);
+    if(old_ctx->stats!=NULL){
+    stats_destroy(old_ctx->stats);
+    }
+    server_pool_deinit(&old_ctx->pool);
+    conf_destroy(old_ctx->cf);
+    munmap(old_ctx->processes, old_ctx->worker_num * sizeof(struct nc_process));
+    nc_free(old_ctx);
 
     return ctx;
 }

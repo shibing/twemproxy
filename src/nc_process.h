@@ -7,7 +7,9 @@ struct nc_process {
     pid_t                 pid;
     struct event_base      *evb;                 /* event base */
     int                   pair_channel[2];  /* socket pair for watcher process and child process */ 
-    int                   channel[2];  /* pipeline for stat child and master */ 
+    int                   channel[2];  /* pipeline for stat child and master */
+    struct conn           dummy_conn;      /* dummy connection for socket pair communication */
+
 };
 
 #define NC_PROCESSES         1
