@@ -386,9 +386,6 @@ core_loop(struct context *ctx)
 
     stats_swap(ctx->stats);
 
-    /* notify stat thread to collect data */
-    write(process->channel[1],"0",1);
-
     log_debug(LOG_NOTICE,"notify to child thread");
 
     return NC_OK;

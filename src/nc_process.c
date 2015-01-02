@@ -6,6 +6,7 @@
 #include <nc_process.h>
 #include <sys/epoll.h>
 #include <sys/socket.h>
+#include <sched.h>
 
 sig_atomic_t nc_reconfigure;
 uint8_t nc_exit;
@@ -203,6 +204,21 @@ void nc_process_init(struct context *ctx){
 
 }
 
+rstatus_t set_cpu_affinity(int i)
+{
+    cpu_set_t mask;
+    CPU_ZERO(&mask);
+    
+    CPU_SET(i,&mask);
+    
+    if(-1 == sched_setaffinity(0,sizeof(cpu_set_t),&mask))
+    {
+        return NC_ERROR;
+    }
+    
+    return NC_OK;
+}
+
 rstatus_t process_spawn(struct context *ctx, int i) {
 
     int status;
@@ -242,6 +258,7 @@ rstatus_t process_spawn(struct context *ctx, int i) {
         return NULL;
 
     case 0:
+        set_cpu_affinity(i);
         process_loop(ctx,i);
         process_deinit(ctx,i);
         _exit(0);

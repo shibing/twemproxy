@@ -1339,44 +1339,9 @@ stats_child_loop(void *arg)
 
     stats_child_data(ctx);
 
-    evb = event_base_create(1, read_channel);
-    if (evb == NULL) {
-        log_error("create stat event_base error");
-    }
-
-    process = &ctx->processes[ctx->current_process_slot];
-
-    status = nc_set_nonblocking(process->channel[0]);
-    if (status < 0) {
-        log_error("set stat non blocking failed");
-    }
-
-    dummy_conn.sd = process->channel[0];
-
-
-    status = event_add_conn(evb, &dummy_conn);
-    if (status < 0) {
-        log_error("event add stat channel pipe failed");
-    }
-
-    s = time(NULL);
-
-    for (;;) {
-        t = time(NULL) - s;
-        log_debug(LOG_VVVERB,"seconds e -s = %d",t);
-        log_debug(LOG_VVVERB,"waiting..");
-        nsd = event_wait(evb,ctx->timeout);
-        log_debug(LOG_VVVERB,"nsd = %d",nsd);
-
-        if(t<=0){
-           log_debug(LOG_VVVERB,"child stat interval too small");
-           continue; 
-        }
-
-        if(nsd>0){
-          stats_aggregate(ctx);
-            s = time(NULL);
-        }
+    for( ;; ){
+        stats_aggregate(ctx);
+        sleep(1);
     }
 
 }
