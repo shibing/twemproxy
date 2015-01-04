@@ -594,6 +594,8 @@ nc_run(struct instance *nci)
 //                pthread_cancel(ctx->stats->tid);
 //                //avoid memory leak
                 pthread_join(ctx->stats->tid,NULL);
+//                usleep(100000);
+
             }
 
             log_error("need reconfigure");
@@ -605,6 +607,9 @@ nc_run(struct instance *nci)
             for(i =0; i< ctx->worker_num; ++i){
                 process_spawn(ctx,i);
             } 
+
+            stats_start_aggregator(ctx);
+
         }
 
     }

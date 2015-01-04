@@ -345,7 +345,7 @@ event_loop_stats(event_stats_cb_t cb, void *arg)
         int n;
         n = epoll_wait(ep, ev2, 1, st->interval);
 
-        log_error("eeeeeeeeeeeeeee n=%d",n);
+        //log_error("eeeeeeeeeeeeeee n=%d",n);
 
         if (st->exit == 1){
             log_error("stat thread eeeeeeeeeeeeeeeexit");

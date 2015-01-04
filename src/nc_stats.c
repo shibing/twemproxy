@@ -885,7 +885,9 @@ stats_loop_callback(void *arg1, void *arg2)
 static void *
 stats_loop(void *arg)
 {
+    struct context *ctx = arg;
     event_loop_stats(stats_loop_callback, arg);
+    close(ctx->stats->sd);
     return NULL;
 }
 
@@ -931,7 +933,7 @@ stats_listen(struct stats *st)
     return NC_OK;
 }
 
-static rstatus_t
+rstatus_t
 stats_start_aggregator(struct context *ctx)
 {
 
@@ -944,16 +946,11 @@ stats_start_aggregator(struct context *ctx)
         return NC_OK;
     }
 
-    if (ctx->old_ctx == NULL) {
         status = stats_listen(st);
         if (status != NC_OK) {
             return status;
         }
 
-    } else {
-        st->sd = ctx->old_ctx->stats->sd;
-
-    }
 
     status = pthread_create(&st->tid, NULL, stats_loop, ctx);
     if (status < 0) {
@@ -1050,11 +1047,8 @@ stats_create(struct context *ctx, uint16_t stats_port, char *stats_ip, int stats
         goto error;
     }
 
+
         ctx->stats = st;
-        status = stats_start_aggregator(ctx);
-        if (status != NC_OK) {
-            goto error;
-        }
 
     return st;
 

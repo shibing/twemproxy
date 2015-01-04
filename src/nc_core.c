@@ -177,6 +177,11 @@ core_ctx_create(struct instance *nci)
     for(i =0; i< ctx->worker_num; ++i){
         process_spawn(ctx,i);
     } 
+
+    status = stats_start_aggregator(ctx);
+    if (status != NC_OK) {
+        log_error("error start agg");
+    }
     return ctx;
 }
 
@@ -517,6 +522,7 @@ core_ctx_update(struct context *old_ctx, struct instance *nci)
 
     core_ctx_destroy(old_ctx);
     ctx->old_ctx = NULL; 
+
 
     return ctx;
 }
