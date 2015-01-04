@@ -230,6 +230,8 @@ rstatus_t proxy_check_listening(void *elem, void *data)
             log_error("same listening copy it");
             pool->p_conn = old_pool->p_conn;
             pool->p_conn->owner = pool;
+        
+            old_pool->reuse = 1;
                 
         }
 
@@ -273,7 +275,8 @@ proxy_each_deinit(void *elem, void *data)
     struct conn *p;
 
     p = pool->p_conn;
-    if (p != NULL) {
+    if (pool->reuse == 0 && p != NULL) {
+        log_debug(LOG_VVERB,"close proxy connection");
         p->close(pool->ctx, p);
     }
 

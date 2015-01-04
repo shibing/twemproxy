@@ -120,6 +120,8 @@ struct server_pool {
     unsigned           auto_eject_hosts:1;   /* auto_eject_hosts? */
     unsigned           preconnect:1;         /* preconnect? */
     unsigned           redis:1;              /* redis? */
+    unsigned           reuse:1;              /* reuse this pool on reload */
+
 };
 
 void server_ref(struct conn *conn, void *owner);

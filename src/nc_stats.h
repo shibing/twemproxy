@@ -114,6 +114,8 @@ struct stats {
 
     volatile int        aggregate;       /* shadow (b) aggregate? */
     volatile int        updated;         /* current (a) updated? */
+    volatile int        exit;            /* need exit current stat loop */
+
 };
 
 #define DEFINE_ACTION(_name, _type, _desc) STATS_POOL_##_name,

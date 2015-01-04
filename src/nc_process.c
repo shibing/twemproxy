@@ -223,6 +223,13 @@ rstatus_t process_spawn(struct context *ctx, int i) {
     int status;
     pid_t pid;
     struct nc_process *process = &ctx->processes[i];
+    sigset_t    set;
+
+    sigemptyset(&set);
+    if (sigprocmask(SIG_SETMASK, &set, NULL) == -1) {
+        log_error("sigprocmask() failed");
+    }
+
 
     log_error("processes address %p",ctx->processes);
     if (socketpair(AF_UNIX, SOCK_STREAM, 0, ctx->processes[i].pair_channel) == -1) {

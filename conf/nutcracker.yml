@@ -1,5 +1,5 @@
 alpha:
-  listen: 127.0.0.1:32121
+  listen: 127.0.0.1:42121
   hash: fnv1a_64
   distribution: ketama
   auto_eject_hosts: true

@@ -70,6 +70,26 @@ core_ctx_create(struct instance *nci)
     ctx->worker_num = nci->worker_num;
     ctx->old_ctx = NULL;
 
+    if (pipe(ctx->channel) < 0 ) {
+        log_error("start pipeline error");
+    }
+
+
+//    status = nc_set_nonblocking(ctx->channel[0]);
+
+    //close(ctx->channel[0]);
+    //
+    //if (status < 0) {
+    //    log_error("pair 0 non block error");
+    //    return NC_ERROR;
+    //}
+    //status = nc_set_nonblocking(ctx->channel[1]);
+    
+//    if (status < 0) {
+//        log_error("pair 1 non block error");
+//        return NC_ERROR;
+//    }
+
 
     /* parse and create configuration */
     ctx->cf = conf_create(nci->conf_filename);
@@ -157,7 +177,6 @@ core_ctx_create(struct instance *nci)
     for(i =0; i< ctx->worker_num; ++i){
         process_spawn(ctx,i);
     } 
-
     return ctx;
 }
 
@@ -335,7 +354,7 @@ core_core(void *arg, uint32_t events)
     struct context *ctx;
     
     if (conn->dummy == 1){
-        log_error("dummpy");
+        //log_error("dummpy");
         return process_read_channel(conn,events);
     }
 
@@ -423,6 +442,13 @@ core_ctx_update(struct context *old_ctx, struct instance *nci)
 
     ctx->old_ctx = old_ctx;
 
+    if (pipe(ctx->channel) < 0 ) {
+        log_error("start pipeline error");
+    }
+
+//    status = nc_set_nonblocking(ctx->channel[0]);
+
+
     ctx->cf = conf_create(nci->conf_filename);
     if (ctx->cf == NULL) {
         nc_free(ctx);
@@ -489,17 +515,8 @@ core_ctx_update(struct context *old_ctx, struct instance *nci)
 
     log_debug(LOG_VVERB, "created ctx %p id %"PRIu32"", ctx, ctx->id);
 
-    //core_ctx_destroy(old_ctx);
+    core_ctx_destroy(old_ctx);
     ctx->old_ctx = NULL; 
-    server_pool_disconnect(old_ctx);
-    event_base_destroy(old_ctx->evb);
-    if(old_ctx->stats!=NULL){
-    stats_destroy(old_ctx->stats);
-    }
-    server_pool_deinit(&old_ctx->pool);
-    conf_destroy(old_ctx->cf);
-    munmap(old_ctx->processes, old_ctx->worker_num * sizeof(struct nc_process));
-    nc_free(old_ctx);
 
     return ctx;
 }

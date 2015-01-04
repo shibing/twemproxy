@@ -1026,6 +1026,8 @@ stats_create(struct context *ctx, uint16_t stats_port, char *stats_ip, int stats
     st->updated = 0;
     st->aggregate = 0;
 
+    st->exit = 0;
+
     /* map server pool to current (a), shadow (b) and sum (c) */
 
     status = stats_pool_map(&st->current, server_pool);

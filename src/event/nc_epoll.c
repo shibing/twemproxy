@@ -297,31 +297,60 @@ event_wait(struct event_base *evb, int timeout)
 void
 event_loop_stats(event_stats_cb_t cb, void *arg)
 {
+
+
+    log_error("event llllllllllllllllll");
+
     struct context *ctx = arg;
     struct stats *st = ctx->stats;
     int status, ep;
-    struct epoll_event ev;
+    struct epoll_event ev,ev1,ev2[2];
 
-    ep = epoll_create(1);
+    //close(ctx->channel[1]);
+
+    ep = epoll_create(2);
     if (ep < 0) {
         log_error("epoll create failed: %s", strerror(errno));
         return;
     }
 
+
+
     ev.data.fd = st->sd;
     ev.events = EPOLLIN;
 
     status = epoll_ctl(ep, EPOLL_CTL_ADD, st->sd, &ev);
+
+        log_error("epoll ctl on e %d sd %d failed: %s", ep, st->sd,
+                  strerror(errno));
+
     if (status < 0) {
         log_error("epoll ctl on e %d sd %d failed: %s", ep, st->sd,
                   strerror(errno));
         goto error;
     }
 
+    ev1.data.fd = ctx->channel[0]; 
+    ev1.events = EPOLLIN;
+
+    status = epoll_ctl(ep, EPOLL_CTL_ADD, ctx->channel[0], &ev1);
+    if (status < 0) {
+        log_error("epoll ctl on e %d sd %d failed: %s", ep, ctx->channel[0],
+                  strerror(errno));
+        goto error;
+    }
+
+
     for (;;) {
         int n;
+        n = epoll_wait(ep, ev2, 1, st->interval);
 
-        n = epoll_wait(ep, &ev, 1, st->interval);
+        log_error("eeeeeeeeeeeeeee n=%d",n);
+
+        if (st->exit == 1){
+            log_error("stat thread eeeeeeeeeeeeeeeexit");
+            break;
+        }
 
         if (n < 0) {
             if (errno == EINTR) {
@@ -332,7 +361,16 @@ event_loop_stats(event_stats_cb_t cb, void *arg)
             break;
         }
 
-        cb(ctx, &n);
+        int i;
+        for(i=0; i<n; ++i){
+            if (ev2[i].data.fd == st->sd) {
+                cb(ctx, &n);
+            } else {
+                 char readbuf[1];
+                 int readbytes = read(ev2[i].data.fd, readbuf, 1);
+//                 log_error("rrrrrrrrrrrr %s",readbuf);
+            }
+        }
     }
 
 error:

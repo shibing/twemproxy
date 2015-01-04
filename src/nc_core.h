@@ -145,6 +145,9 @@ struct context {
 
     struct  context        *old_ctx;             /* old context before reload */
 
+    int                   channel[2];  /* pipeline for stat child and master */
+
+
 };
 
 

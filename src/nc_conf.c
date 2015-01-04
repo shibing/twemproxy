@@ -254,6 +254,7 @@ conf_pool_each_transform(void *elem, void *data)
 
     sp->p_conn = NULL;
     sp->nc_conn_q = 0;
+    sp->reuse = 0;
     TAILQ_INIT(&sp->c_conn_q);
 
     array_null(&sp->server);

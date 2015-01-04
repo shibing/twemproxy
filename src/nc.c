@@ -543,9 +543,16 @@ wait_signal(){
     struct sigaction    act;
     sigemptyset(&zero_mask);
     sigemptyset(&new_mask);
+    signal(SIGCHLD,SIG_IGN);
+    sigaddset(&new_mask, SIGCHLD);
+    sigaddset(&new_mask, SIGUSR2);
+
+    if (sigprocmask(SIG_BLOCK, &new_mask, NULL) == -1) {
+        log_error("block signal error");
+    }
+
 
     sigsuspend(&zero_mask);
-    signal(SIGCHLD,SIG_IGN);
 
 }
 
@@ -553,26 +560,42 @@ static void
 nc_run(struct instance *nci)
 {
     struct context *ctx;
+    sigset_t    set;
 
     ctx = core_start(nci);
     if (ctx == NULL) {
         return;
     }
 
+    sigemptyset(&set);
+    sigaddset(&set, SIGUSR2);
+    
+    if (sigprocmask(SIG_BLOCK, &set, NULL) == -1) {
+        log_error("sigprocmask() failed");
+                 
+    }
+    
+    sigemptyset(&set);
+
     /* run rabbit run */
     for (;;) {
         //sleep(1);
-        wait_signal();
+        //wait_signal();
+        sigsuspend(&set);
 
         if (nc_reconfigure) {
-
+            nc_reconfigure = 0;
             if(ctx->stats!=NULL){
-                pthread_cancel(ctx->stats->tid);
-                //avoid memory leak
+                log_error("set stat exit = 1");
+                ctx->stats->exit = 1;
+                close(ctx->channel[0]);
+                write(ctx->channel[1],"1",1);
+
+//                pthread_cancel(ctx->stats->tid);
+//                //avoid memory leak
                 pthread_join(ctx->stats->tid,NULL);
             }
 
-            nc_reconfigure = 0;
             log_error("need reconfigure");
             signal_processes(ctx,NC_RELOAD);
 
