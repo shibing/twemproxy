@@ -297,16 +297,10 @@ event_wait(struct event_base *evb, int timeout)
 void
 event_loop_stats(event_stats_cb_t cb, void *arg)
 {
-
-
-    log_error("event llllllllllllllllll");
-
     struct context *ctx = arg;
     struct stats *st = ctx->stats;
     int status, ep;
     struct epoll_event ev,ev1,ev2[2];
-
-    //close(ctx->channel[1]);
 
     ep = epoll_create(2);
     if (ep < 0) {
@@ -314,15 +308,10 @@ event_loop_stats(event_stats_cb_t cb, void *arg)
         return;
     }
 
-
-
     ev.data.fd = st->sd;
     ev.events = EPOLLIN;
 
     status = epoll_ctl(ep, EPOLL_CTL_ADD, st->sd, &ev);
-
-        log_error("epoll ctl on e %d sd %d failed: %s", ep, st->sd,
-                  strerror(errno));
 
     if (status < 0) {
         log_error("epoll ctl on e %d sd %d failed: %s", ep, st->sd,
@@ -340,15 +329,12 @@ event_loop_stats(event_stats_cb_t cb, void *arg)
         goto error;
     }
 
-
     for (;;) {
         int n;
-        n = epoll_wait(ep, ev2, 1, st->interval);
-
-        //log_error("eeeeeeeeeeeeeee n=%d",n);
+        n = epoll_wait(ep, ev2, 2, st->interval);
 
         if (st->exit == 1){
-            log_error("stat thread eeeeeeeeeeeeeeeexit");
+            log_debug(LOG_VVERB, "stat thread exit");
             break;
         }
 
@@ -361,14 +347,14 @@ event_loop_stats(event_stats_cb_t cb, void *arg)
             break;
         }
 
-        int i;
+        int i,readbytes;
+        char readbuf[1];
         for(i=0; i<n; ++i){
             if (ev2[i].data.fd == st->sd) {
                 cb(ctx, &n);
+
             } else {
-                 char readbuf[1];
-                 int readbytes = read(ev2[i].data.fd, readbuf, 1);
-//                 log_error("rrrrrrrrrrrr %s",readbuf);
+                readbytes = read(ev2[i].data.fd, readbuf, 1);
             }
         }
     }

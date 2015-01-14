@@ -579,30 +579,24 @@ nc_run(struct instance *nci)
 
     /* run rabbit run */
     for (;;) {
-        //sleep(1);
-        //wait_signal();
         sigsuspend(&set);
 
         if (nc_reconfigure) {
             nc_reconfigure = 0;
-            if(ctx->stats!=NULL){
-                log_error("set stat exit = 1");
+            if(ctx->stats!=NULL && ctx->stats->tid!=-1){
+                log_debug(LOG_VVERB, "set stat exit = 1");
                 ctx->stats->exit = 1;
                 close(ctx->channel[0]);
                 write(ctx->channel[1],"1",1);
-
-//                pthread_cancel(ctx->stats->tid);
-//                //avoid memory leak
                 pthread_join(ctx->stats->tid,NULL);
-//                usleep(100000);
 
             }
 
-            log_error("need reconfigure");
+            log_debug(LOG_VVERB, "need reconfigure");
             signal_processes(ctx,NC_RELOAD);
 
             ctx = core_ctx_update(ctx, nci);
-            //respawn
+            /* respawn */
             int i = 0;
             for(i =0; i< ctx->worker_num; ++i){
                 process_spawn(ctx,i);
