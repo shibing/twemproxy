@@ -46,6 +46,34 @@ core_calc_connections(struct context *ctx)
     return NC_OK;
 }
 
+static void 
+conf_change_to_conf(struct conf *ccf, struct conf *cf)
+{
+    struct array *cfp_pool = &ccf->pool;
+    uint32_t i, j;
+    /* O(N^2) complicated */
+    for(i = 0; i< array_n(cfp_pool); ++i){
+        struct conf_pool * cfp = array_get(cfp_pool,i);
+
+        for(j = 0; j < array_n(&cf->pool); ++j){
+            struct conf_pool *p = array_get(&cf->pool,j);
+            if (string_compare(&p->name, &cfp->name)!=0) {
+               continue; 
+            }
+
+            if (cfp->change_list.nelem!=0){
+                p->change_list = cfp->change_list;
+                p->migrating = 1;
+                log_debug(LOG_NOTICE, "p %.*s running in migrating mode",
+                  p->name.len,p->name.data);
+
+            }
+            
+        }
+
+    }
+}
+
 static struct context *
 core_ctx_create(struct instance *nci)
 {
@@ -97,6 +125,12 @@ core_ctx_create(struct instance *nci)
         nc_free(ctx);
         return NULL;
     }
+
+    /* TODO if running in migrating mode */
+    /* parse change_list config */
+    struct conf *change_cf = conf_change_create(nci->conf_change_filename); 
+    conf_change_to_conf(change_cf, ctx->cf);
+     
 
     /* initialize server pool from configuration */
     status = server_pool_init(&ctx->pool, &ctx->cf->pool, ctx);

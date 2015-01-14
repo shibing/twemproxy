@@ -29,6 +29,7 @@
 #include <nc_signal.h>
 
 #define NC_CONF_PATH        "conf/nutcracker.yml"
+#define NC_CONF_CHANGE_PATH        "conf/change_list.yml"
 
 #define NC_LOG_DEFAULT      LOG_NOTICE
 #define NC_LOG_MIN          LOG_EMERG
@@ -52,24 +53,25 @@ static int daemonize;
 static int describe_stats;
 
 static struct option long_options[] = {
-    { "help",           no_argument,        NULL,   'h' },
-    { "version",        no_argument,        NULL,   'V' },
-    { "test-conf",      no_argument,        NULL,   't' },
-    { "daemonize",      no_argument,        NULL,   'd' },
-    { "describe-stats", no_argument,        NULL,   'D' },
-    { "verbose",        required_argument,  NULL,   'v' },
-    { "output",         required_argument,  NULL,   'o' },
-    { "conf-file",      required_argument,  NULL,   'c' },
-    { "stats-port",     required_argument,  NULL,   's' },
-    { "stats-interval", required_argument,  NULL,   'i' },
-    { "stats-addr",     required_argument,  NULL,   'a' },
-    { "pid-file",       required_argument,  NULL,   'p' },
-    { "mbuf-size",      required_argument,  NULL,   'm' },
-    { "worker-num",     required_argument,  NULL,   'w' },
-    { NULL,             0,                  NULL,    0  }
+    { "help",               no_argument,        NULL,   'h' },
+    { "version",            no_argument,        NULL,   'V' },
+    { "test-conf",          no_argument,        NULL,   't' },
+    { "daemonize",          no_argument,        NULL,   'd' },
+    { "describe-stats",     no_argument,        NULL,   'D' },
+    { "verbose",            required_argument,  NULL,   'v' },
+    { "output",             required_argument,  NULL,   'o' },
+    { "conf-file",          required_argument,  NULL,   'c' },
+    { "change-conf-file",   required_argument,  NULL,   'C' },
+    { "stats-port",         required_argument,  NULL,   's' },
+    { "stats-interval",     required_argument,  NULL,   'i' },
+    { "stats-addr",         required_argument,  NULL,   'a' },
+    { "pid-file",           required_argument,  NULL,   'p' },
+    { "mbuf-size",          required_argument,  NULL,   'm' },
+    { "worker-num",         required_argument,  NULL,   'w' },
+    { NULL,                 0,                  NULL,    0  }
 };
 
-static char short_options[] = "hVtdDv:o:c:s:i:a:p:m:w:";
+static char short_options[] = "hVtdDv:o:c:s:i:a:p:m:w:C:";
 
 static rstatus_t
 nc_daemonize(int dump_core)
@@ -209,21 +211,22 @@ nc_show_usage(void)
         "");
     log_stderr(
         "Options:" CRLF
-        "  -h, --help             : this help" CRLF
-        "  -V, --version          : show version and exit" CRLF
-        "  -t, --test-conf        : test configuration for syntax errors and exit" CRLF
-        "  -d, --daemonize        : run as a daemon" CRLF
-        "  -D, --describe-stats   : print stats description and exit");
+        "  -h, --help                   : this help" CRLF
+        "  -V, --version                : show version and exit" CRLF
+        "  -t, --test-conf              : test configuration for syntax errors and exit" CRLF
+        "  -d, --daemonize              : run as a daemon" CRLF
+        "  -D, --describe-stats         : print stats description and exit");
     log_stderr(
-        "  -v, --verbosity=N      : set logging level (default: %d, min: %d, max: %d)" CRLF
-        "  -o, --output=S         : set logging file (default: %s)" CRLF
-        "  -c, --conf-file=S      : set configuration file (default: %s)" CRLF
-        "  -s, --stats-port=N     : set stats monitoring port (default: %d)" CRLF
-        "  -a, --stats-addr=S     : set stats monitoring ip (default: %s)" CRLF
-        "  -i, --stats-interval=N : set stats aggregation interval in msec (default: %d msec)" CRLF
-        "  -p, --pid-file=S       : set pid file (default: %s)" CRLF
-        "  -m, --mbuf-size=N      : set size of mbuf chunk in bytes (default: %d bytes)" CRLF
-        "  -w, --worker-num=N     : set worker number (default: %d)" CRLF
+        "  -v, --verbosity=N            : set logging level (default: %d, min: %d, max: %d)" CRLF
+        "  -o, --output=S               : set logging file (default: %s)" CRLF
+        "  -c, --conf-file=S            : set configuration file (default: %s)" CRLF
+        "  -C, --change-conf-file=S     : set configuration file (default: %s)" CRLF
+        "  -s, --stats-port=N           : set stats monitoring port (default: %d)" CRLF
+        "  -a, --stats-addr=S           : set stats monitoring ip (default: %s)" CRLF
+        "  -i, --stats-interval=N       : set stats aggregation interval in msec (default: %d msec)" CRLF
+        "  -p, --pid-file=S             : set pid file (default: %s)" CRLF
+        "  -m, --mbuf-size=N            : set size of mbuf chunk in bytes (default: %d bytes)" CRLF
+        "  -w, --worker-num=N           : set worker number (default: %d)" CRLF
         "",
         NC_LOG_DEFAULT, NC_LOG_MIN, NC_LOG_MAX,
         NC_LOG_PATH != NULL ? NC_LOG_PATH : "stderr",
@@ -287,6 +290,7 @@ nc_set_default_options(struct instance *nci)
     nci->log_filename = NC_LOG_PATH;
 
     nci->conf_filename = NC_CONF_PATH;
+    nci->conf_change_filename = NC_CONF_CHANGE_PATH;
 
     nci->stats_port = NC_STATS_PORT;
     nci->stats_addr = NC_STATS_ADDR;
@@ -362,6 +366,10 @@ nc_get_options(int argc, char **argv, struct instance *nci)
             nci->conf_filename = optarg;
             break;
 
+        case 'C':
+            nci->conf_change_filename = optarg;
+            break;
+
         case 's':
             value = nc_atoi(optarg, strlen(optarg));
             if (value < 0) {
@@ -433,6 +441,7 @@ nc_get_options(int argc, char **argv, struct instance *nci)
             case 'o':
             case 'c':
             case 'p':
+            case 'C':
                 log_stderr("nutcracker: option -%c requires a file name",
                            optopt);
                 break;

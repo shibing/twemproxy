@@ -102,8 +102,25 @@ static struct command conf_commands[] = {
       conf_add_server,
       offsetof(struct conf_pool, server) },
 
+    { string("change_list"),
+      conf_add_change_item,
+      offsetof(struct conf_pool, change_list) },
+
     null_command
 };
+
+static void
+conf_change_item_init(struct conf_change_item *cs)
+{
+    cs->start = 0;
+    cs->end = 0;
+    cs->from = 0;
+    cs->to = 0;
+    cs->valid = 0;
+
+
+    log_debug(LOG_VVERB, "init conf change_item %p", cs);
+}
 
 static void
 conf_server_init(struct conf_server *cs)
@@ -196,6 +213,7 @@ conf_pool_init(struct conf_pool *cp, struct string *name)
     cp->server_failure_limit = CONF_UNSET_NUM;
 
     array_null(&cp->server);
+    array_null(&cp->change_list);
 
     cp->valid = 0;
 
@@ -210,6 +228,9 @@ conf_pool_init(struct conf_pool *cp, struct string *name)
         string_deinit(&cp->name);
         return status;
     }
+
+
+    status = array_init(&cp->change_list, CONF_DEFAULT_CHANGE_LIST, sizeof(struct conf_change_item));
 
     log_debug(LOG_VVERB, "init conf pool %p, '%.*s'", cp, name->len, name->data);
 
@@ -289,6 +310,9 @@ conf_pool_each_transform(void *elem, void *data)
     sp->server_failure_limit = (uint32_t)cp->server_failure_limit;
     sp->auto_eject_hosts = cp->auto_eject_hosts ? 1 : 0;
     sp->preconnect = cp->preconnect ? 1 : 0;
+
+    sp->migrating = cp->migrating;
+    sp->change_list = cp->change_list;
 
     status = server_init(&sp->server, &cp->server, sp);
     if (status != NC_OK) {
@@ -1324,6 +1348,38 @@ conf_post_validate(struct conf *cf)
     return NC_OK;
 }
 
+struct conf * 
+conf_change_create(char *filename)
+{
+    rstatus_t status;
+    struct conf *cf;
+
+    cf = conf_open(filename);
+    if (cf == NULL) {
+        return NULL;
+    }
+
+    /* parse the configuration file */
+    status = conf_parse(cf);
+    if (status != NC_OK) {
+        goto error;
+    }
+
+    conf_dump(cf);
+
+    fclose(cf->fh);
+    cf->fh = NULL;
+    
+    return cf;
+
+error:
+    fclose(cf->fh);
+    cf->fh = NULL;
+    //TODO destroy
+    //conf_destroy(cf);
+    return NULL;
+}
+
 struct conf *
 conf_create(char *filename)
 {
@@ -1470,6 +1526,80 @@ conf_set_listen(struct conf *cf, struct command *cmd, void *conf)
     }
 
     field->valid = 1;
+
+    return CONF_OK;
+}
+
+char *
+conf_add_change_item(struct conf *cf, struct command *cmd, void *conf)
+{
+    //rstatus_t status;
+    struct array *a;
+    struct string *value;
+    struct conf_change_item *field;
+
+    uint8_t *p, *q, *start;
+    uint8_t *ct_start,*ct_end;
+    uint8_t *from,*to;
+
+    uint32_t ct_startlen,ct_endlen,fromlen,tolen;
+
+    p = conf;
+    a = (struct array *)(p + cmd->offset);
+    field = array_push(a);
+    if (field == NULL) {
+        return CONF_ERROR;
+    }
+
+    conf_change_item_init(field);
+
+    //log_debug(LOG_VVERB, "offset %d", cmd->offset);
+    value = array_top(&cf->arg);
+
+    //log_debug(LOG_VVERB, "xxxxxxxxxxxx %.*s", value->len,value->data);
+
+    char delim[] = "   ";
+    //int delimlen = 3;
+    p = value->data + value->len - 1;
+    start = value->data;
+
+    uint32_t k = 0; 
+    for (k = 0; k < sizeof(delim)-1; k++) {
+        q = nc_strrchr(p, start, delim[k]);
+        switch (k) {
+        case 0:
+            to = q + 1;
+            tolen = (uint32_t)(p - to + 1);
+            
+            break;
+        case 1:
+            from = q + 1;
+            fromlen = (uint32_t)(p - from + 1);
+            break;
+
+        case 2:
+            ct_end = q + 1;
+            ct_endlen = (uint32_t)(p - ct_end + 1);
+            break;
+
+        default:
+            NOT_REACHED();
+
+        }
+        p = q-1;
+ 
+    }
+
+    ct_start = start;
+    ct_startlen = (uint32_t)(p - start + 1);
+
+    field->start = nc_atoi(ct_start,ct_startlen);
+    field->end = nc_atoi(ct_end,ct_endlen);
+    field->from = nc_atoi(from,fromlen);
+    field->to = nc_atoi(to,tolen);
+    field->valid = 1;
+    log_debug(LOG_VVERB, "start %d, end %d, from %d, to %d", field->start,field->end,field->from,field->to);
+    
 
     return CONF_OK;
 }

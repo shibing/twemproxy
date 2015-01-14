@@ -168,7 +168,7 @@ typedef enum msg_parse_result {
     ACTION( RSP_REDIS_BULK )                                                                        \
     ACTION( RSP_REDIS_MULTIBULK )                                                                   \
     ACTION( SENTINEL )                                                                              \
-
+    ACTION( MSG_ASK )                                                                              \
 
 #define DEFINE_ACTION(_name) MSG_##_name,
 typedef enum msg_type {
@@ -241,6 +241,8 @@ struct msg {
     unsigned             fdone:1;         /* all fragments are done? */
     unsigned             swallow:1;       /* swallow response? */
     unsigned             redis:1;         /* redis? */
+    struct msg           *next_msg;       /*for asking mode in migrating */
+
 };
 
 TAILQ_HEAD(msg_tqh, msg);

@@ -916,3 +916,56 @@ server_pool_deinit(struct array *server_pool)
 
     log_debug(LOG_DEBUG, "deinit %"PRIu32" pools", npool);
 }
+
+static struct conf_change_item *
+find_change(uint32_t key_hash,struct array *change_list){
+    uint32_t left = 0; 
+    uint32_t right = array_n(change_list);
+    uint32_t total = right;
+    uint32_t middle = 0;
+    struct conf_change_item *item = NULL;
+    while (left < right ){
+       middle = left + (right - left) / 2;
+       item = array_get(change_list,middle); 
+       if (item->start <= key_hash){
+            left = middle + 1;
+
+       } else {
+            right = middle;
+       }
+    
+    }
+
+    if (right>0 && right <=total){
+        item = array_get(change_list,right - 1);
+    }
+    return item;
+        
+}
+
+struct conf_change_item *
+find_to_server(struct server_pool *pool, uint8_t *key,
+                 uint32_t keylen)
+{
+    rstatus_t status;
+    uint32_t key_hash;
+    
+    status = server_pool_update(pool);
+    if (status != NC_OK) {
+        return NULL;
+    }
+    key_hash = server_pool_hash(pool, key, keylen);
+
+
+    struct conf_change_item *change_item = find_change(key_hash,&pool->change_list);
+
+    if (change_item!=NULL && key_hash < change_item->end) {
+        log_debug(LOG_VVERB, "xxxxxxxx find changing item from %d to %d",change_item->from,change_item->to);
+        return change_item;
+
+    } else {
+        return NULL;
+    }
+    
+}
+

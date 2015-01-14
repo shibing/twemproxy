@@ -554,6 +554,76 @@ req_forward(struct context *ctx, struct conn *c_conn, struct msg *msg)
     }
     ASSERT(!s_conn->client && !s_conn->proxy);
 
+    if (pool->migrating==1){
+        //TODO in migrating mode, need to run in live reshard mode
+        struct conf_change_item * change_item = find_to_server((struct server_pool *)c_conn->owner, key, keylen);
+        if(change_item!=NULL){
+            struct mbuf *mbuf;
+            size_t msize;
+            //ssize_t n;
+
+            struct msg *msg1 = NULL; 
+            msg1 = req_get(c_conn);
+            msg1->type = MSG_MSG_ASK;
+            mbuf = STAILQ_LAST(&msg1->mhdr, mbuf, next);
+            if (mbuf == NULL || mbuf_full(mbuf)) {
+                mbuf = mbuf_get();
+                if (mbuf == NULL) {
+                    return ;
+                }
+                mbuf_insert(&msg1->mhdr, mbuf);
+                msg1->pos = mbuf->pos;
+            }
+            ASSERT(mbuf->end - mbuf->last > 0);
+
+            msize = mbuf_size(mbuf);
+
+            
+            char *cmd_base = "*2\r\n$6\r\nEXISTS\r\n$";//1\r\n";
+            size_t cmd_len = strlen(cmd_base);
+            char buff[128];
+            snprintf (buff, sizeof(buff), "%d\r\n",keylen);
+            size_t buff_len = strlen(buff);
+            uint32_t total_len = (uint32_t) (cmd_len + keylen + buff_len+ 2);
+
+            //string_concat(cmd,&exists,&key_str);
+            uint64_t pos = (uint64_t)mbuf->last;
+            nc_memcpy((void*)pos,(void*)cmd_base,cmd_len);
+            pos += cmd_len;
+            nc_memcpy((void*)pos,(void*)buff,buff_len);
+            pos += buff_len;
+            nc_memcpy((void*)pos,(void*)key,keylen+2);
+
+            mbuf->last += total_len;
+            msg1->mlen += (uint32_t)total_len; 
+
+            //msg1->parser = redis_parse_req;
+            msg1->parser(msg1);
+
+            msg1->next_msg = msg;
+            msg1->change_item = change_item;
+            msg1->pool = pool;
+            msg = msg1;
+
+            uint32_t idx = change_item->from;
+            struct server *server = array_get(&pool->server, idx);
+            struct conn *f_conn = server_conn(server);
+            if (f_conn->connected!=1){
+                server_connect(ctx, server, f_conn);
+            }
+
+            if (f_conn == NULL) {
+                req_forward_error(ctx, c_conn, msg);
+                return;
+            }
+
+            s_conn = f_conn;
+            log_debug(LOG_VVERB, "runing in migrate mode");
+        }
+        
+    }
+
+
     /* enqueue the message (request) into server inq */
     if (TAILQ_EMPTY(&s_conn->imsg_q)) {
         status = event_add_out(ctx->processes[ctx->current_process_slot].evb, s_conn);

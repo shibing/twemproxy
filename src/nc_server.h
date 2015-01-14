@@ -121,7 +121,8 @@ struct server_pool {
     unsigned           preconnect:1;         /* preconnect? */
     unsigned           redis:1;              /* redis? */
     unsigned           reuse:1;              /* reuse this pool on reload */
-
+    struct array       change_list;          /* change_list: conf_change_item[] */
+    int                migrating;            /* migrating status */
 };
 
 void server_ref(struct conn *conn, void *owner);
@@ -143,5 +144,7 @@ rstatus_t server_pool_preconnect(struct context *ctx);
 void server_pool_disconnect(struct context *ctx);
 rstatus_t server_pool_init(struct array *server_pool, struct array *conf_pool, struct context *ctx);
 void server_pool_deinit(struct array *server_pool);
+struct conf_change_item *find_to_server(struct server_pool *pool, uint8_t *key,uint32_t keylen);
+                 
 
 #endif

@@ -32,9 +32,10 @@
 #define CONF_ROOT_DEPTH     1
 #define CONF_MAX_DEPTH      CONF_ROOT_DEPTH + 1
 
-#define CONF_DEFAULT_ARGS       3
-#define CONF_DEFAULT_POOL       8
-#define CONF_DEFAULT_SERVERS    8
+#define CONF_DEFAULT_ARGS           3
+#define CONF_DEFAULT_POOL           8
+#define CONF_DEFAULT_SERVERS        8
+#define CONF_DEFAULT_CHANGE_LIST    128
 
 #define CONF_UNSET_NUM  -1
 #define CONF_UNSET_PTR  NULL
@@ -82,12 +83,14 @@ struct conf_pool {
     int                client_connections;    /* client_connections: */
     int                redis;                 /* redis: */
     struct string      redis_auth;            /* redis auth password */
+    int                migrating;             /* migrating status */
     int                preconnect;            /* preconnect: */
     int                auto_eject_hosts;      /* auto_eject_hosts: */
     int                server_connections;    /* server_connections: */
     int                server_retry_timeout;  /* server_retry_timeout: in msec */
     int                server_failure_limit;  /* server_failure_limit: */
     struct array       server;                /* servers: conf_server[] */
+    struct array       change_list;           /* change_list: conf_change_item[] */
     unsigned           valid:1;               /* valid? */
 };
 
@@ -115,6 +118,14 @@ struct command {
     int           offset;
 };
 
+struct conf_change_item {
+    uint32_t    start;
+    uint32_t    end;
+    uint32_t    from;
+    uint32_t    to;
+    unsigned    valid:1;
+};
+
 #define null_command { null_string, NULL, 0 }
 
 char *conf_set_string(struct conf *cf, struct command *cmd, void *conf);
@@ -125,11 +136,14 @@ char *conf_set_bool(struct conf *cf, struct command *cmd, void *conf);
 char *conf_set_hash(struct conf *cf, struct command *cmd, void *conf);
 char *conf_set_distribution(struct conf *cf, struct command *cmd, void *conf);
 char *conf_set_hashtag(struct conf *cf, struct command *cmd, void *conf);
+char *conf_add_change_item(struct conf *cf, struct command *cmd, void *conf);
 
 rstatus_t conf_server_each_transform(void *elem, void *data);
 rstatus_t conf_pool_each_transform(void *elem, void *data);
 
 struct conf *conf_create(char *filename);
 void conf_destroy(struct conf *cf);
+
+struct conf *conf_change_create(char *filename);           
 
 #endif
