@@ -61,7 +61,7 @@ static void
 conf_change_to_conf(struct conf *ccf, struct conf *cf)
 {
     struct array *cfp_pool = &ccf->pool;
-    uint32_t i, j;
+    uint32_t i, j, k, nelem;
     /* O(N^2) complicated */
     for(i = 0; i< array_n(cfp_pool); ++i){
         struct conf_pool * cfp = array_get(cfp_pool,i);
@@ -74,7 +74,18 @@ conf_change_to_conf(struct conf *ccf, struct conf *cf)
 
             if (cfp->change_list.nelem!=0){
                 //print_array(&cfp->change_list);
-                p->change_list = cfp->change_list;
+                //p->change_list = cfp->change_list;
+                for (k = 0, nelem = array_n(&cfp->change_list); k < nelem; ++k) {
+                    struct conf_change_item *src_field = array_get(&cfp->change_list, k);
+                    struct conf_change_item *dst_field = array_push(&p->change_list);
+                    dst_field->start = src_field->start;
+                    dst_field->end = src_field->end;
+                    dst_field->from = src_field->from;
+                    dst_field->to = src_field->to;
+                    dst_field->valid = src_field->valid;
+                
+                }
+
                 p->migrating = 1;
                 log_debug(LOG_NOTICE, "p %.*s running in migrating mode",
                   p->name.len,p->name.data);

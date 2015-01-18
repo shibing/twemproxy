@@ -308,6 +308,7 @@ event_loop_stats(event_stats_cb_t cb, void *arg)
         return;
     }
 
+    memset(&ev.data,0,sizeof(epoll_data_t));
     ev.data.fd = st->sd;
     ev.events = EPOLLIN;
 
@@ -319,6 +320,7 @@ event_loop_stats(event_stats_cb_t cb, void *arg)
         goto error;
     }
 
+    memset(&ev1.data,0,sizeof(epoll_data_t));
     ev1.data.fd = ctx->channel[0]; 
     ev1.events = EPOLLIN;
 

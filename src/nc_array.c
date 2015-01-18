@@ -202,3 +202,4 @@ array_each(struct array *a, array_each_t func, void *data)
 
     return NC_OK;
 }
+

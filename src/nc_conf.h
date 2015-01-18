@@ -145,5 +145,6 @@ struct conf *conf_create(char *filename);
 void conf_destroy(struct conf *cf);
 
 struct conf *conf_change_create(char *filename);           
+void conf_change_destroy(struct conf *cf);
 
 #endif

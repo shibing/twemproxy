@@ -259,6 +259,7 @@ conf_pool_deinit(struct conf_pool *cp)
     log_debug(LOG_VVERB, "deinit conf pool %p", cp);
 }
 
+
 rstatus_t
 conf_pool_each_transform(void *elem, void *data)
 {
@@ -1440,6 +1441,9 @@ conf_destroy(struct conf *cf)
 
     nc_free(cf);
 }
+
+
+
 
 char *
 conf_set_string(struct conf *cf, struct command *cmd, void *conf)
