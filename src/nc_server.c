@@ -972,7 +972,7 @@ find_to_server(struct server_pool *pool, uint8_t *key,
 
     struct conf_change_item *change_item = find_change(key_hash,&pool->change_list);
 
-    if (change_item!=NULL && key_hash < change_item->end) {
+    if (change_item!=NULL && (key_hash < change_item->end || change_item->end==0)) {
         log_error( "xxxxxxxx find changing item from %d to %d",change_item->from,change_item->to);
         //log_debug(LOG_VVERB, "xxxxxxxx find changing item from %d to %d",change_item->from,change_item->to);
         return change_item;
