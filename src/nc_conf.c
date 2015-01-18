@@ -254,6 +254,8 @@ conf_pool_deinit(struct conf_pool *cp)
     }
     array_deinit(&cp->server);
 
+    array_deinit(&cp->change_list);
+
     log_debug(LOG_VVERB, "deinit conf pool %p", cp);
 }
 
@@ -1376,7 +1378,7 @@ error:
     fclose(cf->fh);
     cf->fh = NULL;
     //TODO destroy
-    //conf_destroy(cf);
+    conf_destroy(cf);
     return NULL;
 }
 
@@ -1556,7 +1558,7 @@ conf_add_change_item(struct conf *cf, struct command *cmd, void *conf)
     //log_debug(LOG_VVERB, "offset %d", cmd->offset);
     value = array_top(&cf->arg);
 
-    //log_debug(LOG_VVERB, "xxxxxxxxxxxx %.*s", value->len,value->data);
+    //log_error( "xxxxxxxxxxxx %.*s", value->len,value->data);
 
     char delim[] = "   ";
     //int delimlen = 3;
@@ -1593,11 +1595,12 @@ conf_add_change_item(struct conf *cf, struct command *cmd, void *conf)
     ct_start = start;
     ct_startlen = (uint32_t)(p - start + 1);
 
-    field->start = nc_atoi(ct_start,ct_startlen);
-    field->end = nc_atoi(ct_end,ct_endlen);
-    field->from = nc_atoi(from,fromlen);
-    field->to = nc_atoi(to,tolen);
+    field->start = string_to_int(ct_start,ct_startlen);
+    field->end = string_to_int(ct_end,ct_endlen);
+    field->from = string_to_int(from,fromlen);
+    field->to = string_to_int(to,tolen);
     field->valid = 1;
+    //log_error("start %ld, end %ld, from %ld, to %ld", field->start,field->end,field->from,field->to);
     log_debug(LOG_VVERB, "start %d, end %d, from %d, to %d", field->start,field->end,field->from,field->to);
     
 

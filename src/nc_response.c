@@ -17,6 +17,7 @@
 
 #include <nc_core.h>
 #include <nc_server.h>
+#include <nc_conf.h>
 
 struct msg *
 rsp_get(struct conn *conn)
@@ -209,12 +210,13 @@ rsp_forward_stats(struct context *ctx, struct server *server, struct msg *msg)
     stats_server_incr_by(ctx, server, response_bytes, msg->mlen);
 }
 
-static void
+void
 rsp_forward(struct context *ctx, struct conn *s_conn, struct msg *msg)
 {
     rstatus_t status;
     struct msg *pmsg;
     struct conn *c_conn;
+    struct server *server; 
 
     ASSERT(!s_conn->client && !s_conn->proxy);
 
@@ -238,10 +240,51 @@ rsp_forward(struct context *ctx, struct conn *s_conn, struct msg *msg)
     c_conn = pmsg->owner;
     ASSERT(c_conn->client && !c_conn->proxy);
 
-    if (req_done(c_conn, TAILQ_FIRST(&c_conn->omsg_q))) {
-        status = event_add_out(ctx->processes[ctx->current_process_slot].evb, c_conn);
-        if (status != NC_OK) {
-            c_conn->err = errno;
+    if (pmsg->change_item!=NULL){
+        struct server_pool * pool = ((struct server*)s_conn->owner)->owner;
+        log_debug(LOG_NOTICE,"server_pool is %p",pool);
+        uint32_t idx = 0;
+        if (*(msg->pos-msg->mlen+1) == '1' ){
+            idx = pmsg->change_item->from;
+        } else {
+            idx = pmsg->change_item->to;
+        }
+
+
+        if(idx >= array_n(&pool->server)){
+            //something wrong, just use the s_conn owner server
+            log_error("something wrong use s_conn owner server");
+            idx = ((struct server *)s_conn->owner)->idx;
+        }
+
+        log_error("using idx=%d",idx);
+
+        server = array_get(&pool->server, idx);
+        struct conn *f_conn = server_conn(server);
+        if (f_conn->connected!=1){
+            server_connect(ctx, server, f_conn);
+        }
+
+       if (TAILQ_EMPTY(&f_conn->imsg_q)) {
+            status = event_add_out(ctx->processes[ctx->current_process_slot].evb, f_conn);
+            if (status != NC_OK) {
+                 //req_forward_error(ctx, c_conn, msg);
+                 f_conn->err = errno;
+                 //return;
+             }
+       }
+
+       f_conn->enqueue_inq(ctx, f_conn, pmsg->next_msg);
+
+       req_put(pmsg); 
+
+    } else {
+        if (req_done(c_conn, TAILQ_FIRST(&c_conn->omsg_q))) {
+
+            status = event_add_out(ctx->processes[ctx->current_process_slot].evb, c_conn);
+            if (status != NC_OK) {
+                c_conn->err = errno;
+            }
         }
     }
 

@@ -282,3 +282,16 @@ _safe_snprintf(char *to, size_t n, const char *fmt, ...)
     va_end(args);
     return result;
 }
+
+uint32_t 
+string_to_int(uint8_t  *s1,uint32_t len)
+{
+    uint32_t result = 0;
+    while (len--)
+    {
+        result *= 10;
+        result += (uint32_t)((*s1++) - '0');
+    }
+
+    return result;
+}

@@ -46,6 +46,17 @@ core_calc_connections(struct context *ctx)
     return NC_OK;
 }
 
+static void print_array(struct array *arr)
+{
+    int i;
+    struct conf_change_item *item = NULL;
+
+    for(i = 0; i<array_n(arr); ++i){
+        item = array_get(arr,i); 
+        log_error("id=%d,item->start=%ld, end=%ld",i,item->start,item->end);
+    }
+}
+
 static void 
 conf_change_to_conf(struct conf *ccf, struct conf *cf)
 {
@@ -62,6 +73,7 @@ conf_change_to_conf(struct conf *ccf, struct conf *cf)
             }
 
             if (cfp->change_list.nelem!=0){
+                //print_array(&cfp->change_list);
                 p->change_list = cfp->change_list;
                 p->migrating = 1;
                 log_debug(LOG_NOTICE, "p %.*s running in migrating mode",
@@ -126,10 +138,10 @@ core_ctx_create(struct instance *nci)
         return NULL;
     }
 
-    /* TODO if running in migrating mode */
     /* parse change_list config */
     struct conf *change_cf = conf_change_create(nci->conf_change_filename); 
     conf_change_to_conf(change_cf, ctx->cf);
+    conf_destroy(change_cf);
      
 
     /* initialize server pool from configuration */
@@ -229,6 +241,7 @@ core_ctx_destroy(struct context *ctx)
     stats_destroy(ctx->stats);
     server_pool_deinit(&ctx->pool);
     conf_destroy(ctx->cf);
+
     munmap(ctx->processes, ctx->worker_num * sizeof(struct nc_process));
     nc_free(ctx);
 }
@@ -493,6 +506,11 @@ core_ctx_update(struct context *old_ctx, struct instance *nci)
         nc_free(ctx);
         return NULL;
     }
+
+    /* parse change_list config */
+    struct conf *change_cf = conf_change_create(nci->conf_change_filename); 
+    conf_change_to_conf(change_cf, ctx->cf);
+    conf_destroy(change_cf);
 
     status = server_pool_init(&ctx->pool, &ctx->cf->pool, ctx);
     if (status != NC_OK) {

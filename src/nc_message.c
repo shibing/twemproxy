@@ -286,6 +286,8 @@ msg_get(struct conn *conn, bool request, bool redis)
     msg->owner = conn;
     msg->request = request ? 1 : 0;
     msg->redis = redis ? 1 : 0;
+    msg->change_item = NULL;
+    msg->next_msg = NULL;
 
     if (redis) {
         if (request) {

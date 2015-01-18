@@ -135,4 +135,5 @@ _nc_strrchr(uint8_t *p, uint8_t *start, uint8_t c)
     return NULL;
 }
 
+uint32_t string_to_int(uint8_t  *s1,uint32_t len);
 #endif

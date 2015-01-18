@@ -17,6 +17,7 @@
 
 #include <nc_core.h>
 #include <nc_server.h>
+#include <nc_conf.h>
 
 struct msg *
 req_get(struct conn *conn)
@@ -555,6 +556,7 @@ req_forward(struct context *ctx, struct conn *c_conn, struct msg *msg)
     ASSERT(!s_conn->client && !s_conn->proxy);
 
     if (pool->migrating==1){
+        log_error("maybe in migrating mode key='%.*s'", keylen,key);
         //TODO in migrating mode, need to run in live reshard mode
         struct conf_change_item * change_item = find_to_server((struct server_pool *)c_conn->owner, key, keylen);
         if(change_item!=NULL){
@@ -602,7 +604,7 @@ req_forward(struct context *ctx, struct conn *c_conn, struct msg *msg)
 
             msg1->next_msg = msg;
             msg1->change_item = change_item;
-            msg1->pool = pool;
+            //msg1->pool = pool;
             msg = msg1;
 
             uint32_t idx = change_item->from;
@@ -618,7 +620,8 @@ req_forward(struct context *ctx, struct conn *c_conn, struct msg *msg)
             }
 
             s_conn = f_conn;
-            log_debug(LOG_VVERB, "runing in migrate mode");
+            log_error("runing in migrate mode");
+            //log_debug(LOG_VVERB, "runing in migrate mode");
         }
         
     }

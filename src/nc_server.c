@@ -917,6 +917,17 @@ server_pool_deinit(struct array *server_pool)
     log_debug(LOG_DEBUG, "deinit %"PRIu32" pools", npool);
 }
 
+static void print_array(struct array *arr)
+{
+    int i;
+    struct conf_change_item *item = NULL;
+
+    for(i = 0; i<array_n(arr); ++i){
+        item = array_get(arr,i); 
+        log_error("id=%d,item->start=%ld, end=%ld",i,item->start,item->end);
+    }
+}
+
 static struct conf_change_item *
 find_change(uint32_t key_hash,struct array *change_list){
     uint32_t left = 0; 
@@ -924,9 +935,12 @@ find_change(uint32_t key_hash,struct array *change_list){
     uint32_t total = right;
     uint32_t middle = 0;
     struct conf_change_item *item = NULL;
+
     while (left < right ){
        middle = left + (right - left) / 2;
        item = array_get(change_list,middle); 
+       log_debug(LOG_DEBUG,"left = %d, middle = %d,, right = %d, middle_value = %ld, key_hash = %ld",
+                    left,middle,right,item->start, key_hash);
        if (item->start <= key_hash){
             left = middle + 1;
 
@@ -956,11 +970,11 @@ find_to_server(struct server_pool *pool, uint8_t *key,
     }
     key_hash = server_pool_hash(pool, key, keylen);
 
-
     struct conf_change_item *change_item = find_change(key_hash,&pool->change_list);
 
     if (change_item!=NULL && key_hash < change_item->end) {
-        log_debug(LOG_VVERB, "xxxxxxxx find changing item from %d to %d",change_item->from,change_item->to);
+        log_error( "xxxxxxxx find changing item from %d to %d",change_item->from,change_item->to);
+        //log_debug(LOG_VVERB, "xxxxxxxx find changing item from %d to %d",change_item->from,change_item->to);
         return change_item;
 
     } else {

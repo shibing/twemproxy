@@ -182,66 +182,68 @@ struct keypos {
 };
 
 struct msg {
-    TAILQ_ENTRY(msg)     c_tqe;           /* link in client q */
-    TAILQ_ENTRY(msg)     s_tqe;           /* link in server q */
-    TAILQ_ENTRY(msg)     m_tqe;           /* link in send q / free q */
+    TAILQ_ENTRY(msg)                    c_tqe;           /* link in client q */
+    TAILQ_ENTRY(msg)                    s_tqe;           /* link in server q */
+    TAILQ_ENTRY(msg)                    m_tqe;           /* link in send q / free q */
 
-    uint64_t             id;              /* message id */
-    struct msg           *peer;           /* message peer */
-    struct conn          *owner;          /* message owner - client | server */
+    uint64_t                            id;              /* message id */
+    struct msg                          *peer;           /* message peer */
+    struct conn                         *owner;          /* message owner - client | server */
 
-    struct rbnode        tmo_rbe;         /* entry in rbtree */
+    struct rbnode                       tmo_rbe;         /* entry in rbtree */
 
-    struct mhdr          mhdr;            /* message mbuf header */
-    uint32_t             mlen;            /* message length */
-    int64_t              start_ts;        /* request start timestamp in usec */
+    struct mhdr                         mhdr;            /* message mbuf header */
+    uint32_t                            mlen;            /* message length */
+    int64_t                             start_ts;        /* request start timestamp in usec */
 
-    int                  state;           /* current parser state */
-    uint8_t              *pos;            /* parser position marker */
-    uint8_t              *token;          /* token marker */
+    int                                 state;           /* current parser state */
+    uint8_t                             *pos;            /* parser position marker */
+    uint8_t                             *token;          /* token marker */
 
-    msg_parse_t          parser;          /* message parser */
-    msg_parse_result_t   result;          /* message parsing result */
+    msg_parse_t                         parser;          /* message parser */
+    msg_parse_result_t                  result;          /* message parsing result */
 
-    msg_fragment_t       fragment;        /* message fragment */
-    msg_reply_t          reply;           /* gen message reply (example: ping) */
-    msg_add_auth_t       add_auth;        /* add auth message when we forward msg */
+    msg_fragment_t                      fragment;        /* message fragment */
+    msg_reply_t                         reply;           /* gen message reply (example: ping) */
+    msg_add_auth_t                      add_auth;        /* add auth message when we forward msg */
 
-    msg_coalesce_t       pre_coalesce;    /* message pre-coalesce */
-    msg_coalesce_t       post_coalesce;   /* message post-coalesce */
+    msg_coalesce_t                      pre_coalesce;    /* message pre-coalesce */
+    msg_coalesce_t                      post_coalesce;   /* message post-coalesce */
 
-    msg_type_t           type;            /* message type */
+    msg_type_t                          type;            /* message type */
 
-    struct array         *keys;           /* array of keypos, for req */
+    struct array                        *keys;           /* array of keypos, for req */
 
-    uint32_t             vlen;            /* value length (memcache) */
-    uint8_t              *end;            /* end marker (memcache) */
+    uint32_t                            vlen;            /* value length (memcache) */
+    uint8_t                             *end;            /* end marker (memcache) */
 
-    uint8_t              *narg_start;     /* narg start (redis) */
-    uint8_t              *narg_end;       /* narg end (redis) */
-    uint32_t             narg;            /* # arguments (redis) */
-    uint32_t             rnarg;           /* running # arg used by parsing fsa (redis) */
-    uint32_t             rlen;            /* running length in parsing fsa (redis) */
-    uint32_t             integer;         /* integer reply value (redis) */
+    uint8_t                             *narg_start;     /* narg start (redis) */
+    uint8_t                             *narg_end;       /* narg end (redis) */
+    uint32_t                            narg;            /* # arguments (redis) */
+    uint32_t                            rnarg;           /* running # arg used by parsing fsa (redis) */
+    uint32_t                            rlen;            /* running length in parsing fsa (redis) */
+    uint32_t                            integer;         /* integer reply value (redis) */
 
-    struct msg           *frag_owner;     /* owner of fragment message */
-    uint32_t             nfrag;           /* # fragment */
-    uint32_t             nfrag_done;      /* # fragment done */
-    uint64_t             frag_id;         /* id of fragmented message */
-    struct msg           **frag_seq;      /* sequence of fragment message, map from keys to fragments*/
+    struct msg                          *frag_owner;     /* owner of fragment message */
+    uint32_t                            nfrag;           /* # fragment */
+    uint32_t                            nfrag_done;      /* # fragment done */
+    uint64_t                            frag_id;         /* id of fragmented message */
+    struct msg                          **frag_seq;      /* sequence of fragment message, map from keys to fragments*/
 
-    err_t                err;             /* errno on error? */
-    unsigned             error:1;         /* error? */
-    unsigned             ferror:1;        /* one or more fragments are in error? */
-    unsigned             request:1;       /* request? or response? */
-    unsigned             quit:1;          /* quit request? */
-    unsigned             noreply:1;       /* noreply? */
-    unsigned             noforward:1;     /* not need forward (example: ping) */
-    unsigned             done:1;          /* done? */
-    unsigned             fdone:1;         /* all fragments are done? */
-    unsigned             swallow:1;       /* swallow response? */
-    unsigned             redis:1;         /* redis? */
-    struct msg           *next_msg;       /*for asking mode in migrating */
+    err_t                               err;             /* errno on error? */
+    unsigned                            error:1;         /* error? */
+    unsigned                            ferror:1;        /* one or more fragments are in error? */
+    unsigned                            request:1;       /* request? or response? */
+    unsigned                            quit:1;          /* quit request? */
+    unsigned                            noreply:1;       /* noreply? */
+    unsigned                            noforward:1;     /* not need forward (example: ping) */
+    unsigned                            done:1;          /* done? */
+    unsigned                            fdone:1;         /* all fragments are done? */
+    unsigned                            swallow:1;       /* swallow response? */
+    unsigned                            redis:1;         /* redis? */
+    struct msg                          *next_msg;       /*for asking mode in migrating */
+    struct conf_change_item             *change_item;    /*for asking mode in migrating */
+
 
 };
 
