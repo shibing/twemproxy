@@ -163,6 +163,7 @@ conf_server_each_transform(void *elem, void *data)
 
     s->pname = cs->pname;
     s->name = cs->name;
+    s->host = cs->host;
     s->port = (uint16_t)cs->port;
     s->weight = (uint32_t)cs->weight;
 
@@ -1621,10 +1622,9 @@ conf_add_server(struct conf *cf, struct command *cmd, void *conf)
     uint8_t *p, *q, *start;
     uint8_t *pname, *addr, *port, *weight, *name;
     uint32_t k, delimlen, pnamelen, addrlen, portlen, weightlen, namelen;
-    struct string address;
+    //struct string address;
     char delim[] = " ::";
 
-    string_init(&address);
     p = conf;
     a = (struct array *)(p + cmd->offset);
 
@@ -1632,6 +1632,8 @@ conf_add_server(struct conf *cf, struct command *cmd, void *conf)
     if (field == NULL) {
         return CONF_ERROR;
     }
+
+    string_init(&field->host);
 
     conf_server_init(field);
 
@@ -1736,18 +1738,18 @@ conf_add_server(struct conf *cf, struct command *cmd, void *conf)
         return CONF_ERROR;
     }
 
-    status = string_copy(&address, addr, addrlen);
+    status = string_copy(&field->host, addr, addrlen);
     if (status != NC_OK) {
         return CONF_ERROR;
     }
 
-    status = nc_resolve(&address, field->port, &field->info);
+    status = nc_resolve(&field->host, field->port, &field->info);
     if (status != NC_OK) {
-        string_deinit(&address);
+        string_deinit(&field->host);
         return CONF_ERROR;
     }
 
-    string_deinit(&address);
+    //string_deinit(&address);
     field->valid = 1;
 
     return CONF_OK;

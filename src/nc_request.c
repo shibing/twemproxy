@@ -524,6 +524,87 @@ req_forward_stats(struct context *ctx, struct server *server, struct msg *msg)
     stats_server_incr_by(ctx, server, request_bytes, msg->mlen);
 }
 
+uint32_t migrate_cmd(uint8_t *key,uint32_t key_len, uint32_t idx, struct server *server_pool, struct mbuf *mbuf)
+{
+
+    uint32_t total_len = 0;
+    if(idx >= array_n(server_pool)){
+        //something wrong, just use the s_conn owner server
+        log_error("something wrong use s_conn owner server");
+        return NULL;
+    } 
+
+    struct server *server = array_get(server_pool, idx);
+
+    char *cmd_base = "*6\r\n$7\r\nMIGRATE\r\n";//1\r\n";
+    size_t cmd_len = strlen(cmd_base);
+    char buff[128];
+    snprintf (buff, sizeof(buff), "$%d\r\n",server->host.len);
+
+    uint32_t buff_len;
+    buff_len = strlen(buff);
+
+    uint64_t pos = (uint64_t)mbuf->last;           
+
+    nc_memcpy((void*)pos,(void*)cmd_base,cmd_len); 
+    pos += cmd_len;                                
+    total_len += cmd_len;
+
+    //host len
+    nc_memcpy((void*)pos,(void*)buff,buff_len);    
+    pos += buff_len;
+    total_len += buff_len;
+
+    //host
+    nc_memcpy((void*)pos,(void*)server->host.data,server->host.len);
+    pos += server->host.len;
+
+    nc_memcpy((void*)pos,(void*)"\r\n",2);
+    pos += 2;
+
+    //port len
+    snprintf (buff, sizeof(buff), "%d",server->port);
+    buff_len = strlen(buff);
+
+    char buff1[128];
+    snprintf (buff1, sizeof(buff1), "$%d\r\n",buff_len);
+    nc_memcpy((void*)pos,(void*)buff1,strlen(buff1));
+    pos += strlen(buff1);
+    total_len += strlen(buff1);
+
+    //port str
+    nc_memcpy((void*)pos,(void*)buff,buff_len);
+    pos += buff_len;
+    nc_memcpy((void*)pos,(void*)"\r\n",2);
+    pos += 2;
+    total_len += buff_len+2;
+
+    //key len
+    snprintf (buff, sizeof(buff), "$%d\r\n",key_len);
+    buff_len = strlen(buff);
+
+    nc_memcpy((void*)pos,(void*)buff,buff_len);
+    pos += buff_len;
+    total_len += buff_len;
+
+    //key
+    nc_memcpy((void*)pos,(void*)key,key_len);
+    pos += key_len;
+    nc_memcpy((void*)pos,(void*)"\r\n",2);
+    pos += 2;
+    total_len += key_len+2;
+
+    nc_memcpy((void*)pos,(void*)"$0\r\n",4);
+    pos += 4;
+    total_len += 4;
+
+    nc_memcpy((void*)pos,(void*)"1000\r\n",6);
+
+    total_len += 6;
+
+    return total_len;
+}
+
 static void
 req_forward(struct context *ctx, struct conn *c_conn, struct msg *msg)
 {
@@ -562,6 +643,8 @@ req_forward(struct context *ctx, struct conn *c_conn, struct msg *msg)
         if(change_item!=NULL){
             struct mbuf *mbuf;
             size_t msize;
+            uint32_t total_len;
+
             //ssize_t n;
 
             struct msg *msg1 = NULL; 
@@ -580,7 +663,7 @@ req_forward(struct context *ctx, struct conn *c_conn, struct msg *msg)
 
             msize = mbuf_size(mbuf);
 
-            
+            /* 
             char *cmd_base = "*2\r\n$6\r\nEXISTS\r\n$";//1\r\n";
             size_t cmd_len = strlen(cmd_base);
             char buff[128];
@@ -595,6 +678,9 @@ req_forward(struct context *ctx, struct conn *c_conn, struct msg *msg)
             nc_memcpy((void*)pos,(void*)buff,buff_len);
             pos += buff_len;
             nc_memcpy((void*)pos,(void*)key,keylen+2);
+            */
+            
+            total_len = migrate_cmd(key, keylen, change_item->to, &pool->server, mbuf);
 
             mbuf->last += total_len;
             msg1->mlen += (uint32_t)total_len; 
