@@ -242,6 +242,7 @@ redis_argn(struct msg *r)
     case MSG_REQ_REDIS_ZREVRANGEBYSCORE:
     case MSG_REQ_REDIS_ZUNIONSTORE:
     case MSG_REQ_REDIS_ZSCAN:
+    case MSG_REQ_REDIS_MIGRATE:
         return true;
 
     default:
@@ -894,6 +895,12 @@ redis_parse_req(struct msg *r)
                     break;
                 }
 
+                if (str7icmp(m, 'm','i','g','r','a','t','e')) {
+                    r->type = MSG_REQ_REDIS_MIGRATE;
+                    break;
+                }
+
+
                 break;
 
             case 8:
@@ -1044,6 +1051,7 @@ redis_parse_req(struct msg *r)
                     r->type = MSG_REQ_REDIS_ZREVRANGEBYSCORE;
                     break;
                 }
+
 
                 break;
 

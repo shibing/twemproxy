@@ -243,12 +243,13 @@ rsp_forward(struct context *ctx, struct conn *s_conn, struct msg *msg)
     if (pmsg->change_item!=NULL){
         struct server_pool * pool = ((struct server*)s_conn->owner)->owner;
         log_debug(LOG_NOTICE,"server_pool is %p",pool);
-        uint32_t idx = 0;
-        if (*(msg->pos-msg->mlen+1) == '1' ){
-            idx = pmsg->change_item->from;
-        } else {
-            idx = pmsg->change_item->to;
-        }
+        uint32_t idx = pmsg->change_item->to;
+
+        //if (*(msg->pos-msg->mlen+1) == '1' ){
+        //    idx = pmsg->change_item->from;
+        //} else {
+        //    idx = pmsg->change_item->to;
+        //}
 
 
         if(idx >= array_n(&pool->server)){

@@ -548,12 +548,10 @@ uint32_t migrate_cmd(uint8_t *key,uint32_t key_len, uint32_t idx, struct server 
 
     nc_memcpy((void*)pos,(void*)cmd_base,cmd_len); 
     pos += cmd_len;                                
-    total_len += cmd_len;
 
     //host len
     nc_memcpy((void*)pos,(void*)buff,buff_len);    
     pos += buff_len;
-    total_len += buff_len;
 
     //host
     nc_memcpy((void*)pos,(void*)server->host.data,server->host.len);
@@ -570,14 +568,12 @@ uint32_t migrate_cmd(uint8_t *key,uint32_t key_len, uint32_t idx, struct server 
     snprintf (buff1, sizeof(buff1), "$%d\r\n",buff_len);
     nc_memcpy((void*)pos,(void*)buff1,strlen(buff1));
     pos += strlen(buff1);
-    total_len += strlen(buff1);
 
     //port str
     nc_memcpy((void*)pos,(void*)buff,buff_len);
     pos += buff_len;
     nc_memcpy((void*)pos,(void*)"\r\n",2);
     pos += 2;
-    total_len += buff_len+2;
 
     //key len
     snprintf (buff, sizeof(buff), "$%d\r\n",key_len);
@@ -585,27 +581,26 @@ uint32_t migrate_cmd(uint8_t *key,uint32_t key_len, uint32_t idx, struct server 
 
     nc_memcpy((void*)pos,(void*)buff,buff_len);
     pos += buff_len;
-    total_len += buff_len;
 
     //key
     nc_memcpy((void*)pos,(void*)key,key_len);
     pos += key_len;
     nc_memcpy((void*)pos,(void*)"\r\n",2);
     pos += 2;
-    total_len += key_len+2;
 
-    nc_memcpy((void*)pos,(void*)"$0\r\n",4);
-    pos += 4;
-    total_len += 4;
+    nc_memcpy((void*)pos,(void*)"$1\r\n0\r\n",7);
+    pos += 7;
 
-    nc_memcpy((void*)pos,(void*)"1000\r\n",6);
+    nc_memcpy((void*)pos,(void*)"$4\r\n1000\r\n",10);
+    pos += 10;
 
-    total_len += 6;
+    mbuf->last = pos;
 
+    total_len = mbuf->last - mbuf->start;
     return total_len;
 }
 
-static void
+void
 req_forward(struct context *ctx, struct conn *c_conn, struct msg *msg)
 {
     rstatus_t status;
@@ -682,7 +677,7 @@ req_forward(struct context *ctx, struct conn *c_conn, struct msg *msg)
             
             total_len = migrate_cmd(key, keylen, change_item->to, &pool->server, mbuf);
 
-            mbuf->last += total_len;
+            //mbuf->last += total_len;
             msg1->mlen += (uint32_t)total_len; 
 
             //msg1->parser = redis_parse_req;
