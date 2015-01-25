@@ -119,6 +119,7 @@ struct event_base;
 #include <nc_server.h>
 #include <nc_process.h>
 #include <nc_signal.h>
+#include <nc_hashtable.h>
 
 struct context {
     uint32_t               id;                   /* unique context id */
@@ -135,7 +136,7 @@ struct context {
     uint32_t               max_nsconn;           /* max # server connections */
 
     struct nc_process      *processes;           /* all process in the current enviroment */
-    int8_t                current_process_slot; /*current process slot*/  
+    int8_t                 current_process_slot; /*current process slot*/  
     uint8_t worker_num;                          /* number of cpus */
    
     struct stats_packet    *child_stats;         /* all child stats data */
@@ -145,8 +146,10 @@ struct context {
 
     struct  context        *old_ctx;             /* old context before reload */
 
-    int                   channel[2];  /* pipeline for stat child and master */
+    int                    channel[2];           /* pipeline for stat child and master */
 
+    uint32_t               *migrate_bit;         /* migrate key hash bit */
+    struct  hash_table     ht;                  /* hastable */
 
 };
 
@@ -170,7 +173,8 @@ struct instance {
 };
 
 struct nc_cmd {
-     uint8_t  command;
+     uint8_t            command;
+     struct   string    data;
 };
 
 struct context *core_start(struct instance *nci);

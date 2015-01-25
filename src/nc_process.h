@@ -6,9 +6,11 @@
 struct nc_process {        
     pid_t                 pid;
     struct event_base      *evb;                 /* event base */
-    int                   pair_channel[2];  /* socket pair for watcher process and child process */ 
-    int                   channel[2];  /* pipeline for stat child and master */
-    struct conn           dummy_conn;      /* dummy connection for socket pair communication */
+    int                   ht_channel[2];         /* hashtable socket pair for watcher process and child process */ 
+    int                   pair_channel[2];       /* socket pair for watcher process and child process */ 
+    int                   channel[2];            /* pipeline for stat child and master */
+    struct conn           dummy_conn;            /* dummy connection for socket pair communication */
+    struct conn           ht_dummy_conn;         /* dummy connection for hashtable socket pair communication */
 
 };
 

@@ -197,6 +197,8 @@ event_add_conn(struct event_base *evb, struct conn *c)
     event.data.ptr = c;
 
     status = epoll_ctl(ep, EPOLL_CTL_ADD, c->sd, &event);
+    log_error("epoll ctl on e %d sd %d success pid=%d", ep, c->sd,getpid());
+
     if (status < 0) {
         log_error("epoll ctl on e %d sd %d failed: %s", ep, c->sd,
                   strerror(errno));
@@ -250,8 +252,10 @@ event_wait(struct event_base *evb, int timeout)
                 struct epoll_event *ev = &evb->event[i];
                 uint32_t events = 0;
 
-                log_debug(LOG_VVERB, "epoll %04"PRIX32" triggered on conn %p",
-                          ev->events, ev->data.ptr);
+                log_error("epoll %04"PRIX32" triggered on conn %p pid=%d",
+                          ev->events, ev->data.ptr,getpid());
+                //log_debug(LOG_VVERB, "epoll %04"PRIX32" triggered on conn %p",
+//                          ev->events, ev->data.ptr);
 
                 if (ev->events & EPOLLERR) {
                     events |= EVENT_ERR;

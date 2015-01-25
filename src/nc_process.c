@@ -176,6 +176,11 @@ void nc_process_init(struct context *ctx){
         log_error("close channel 0 failed"); 
     }
 
+    if (close(process->ht_channel[0]) == -1) {
+        log_error("close channel 0 failed"); 
+    }
+
+
     /* add event to channel 1 */
     dummy_conn->dummy = 1;
     dummy_conn->owner = ctx;
@@ -251,11 +256,33 @@ rstatus_t process_spawn(struct context *ctx, int i) {
         return NC_ERROR;
     }
    
-    log_error("spawn socket pair %d %d",process->pair_channel[0],process->pair_channel[1]); 
-    if (status < 0) {
-        log_error("pair 1 non block error");
-        return NC_ERROR;
+
+    if (socketpair(AF_UNIX, SOCK_STREAM, 0, ctx->processes[i].ht_channel) == -1) {
+            log_error("socketpair() failed while spawn %s",strerror(errno));
+            return NC_ERROR;
     }
+
+    //status = nc_set_nonblocking(process->ht_channel[0]);
+    //if (status < 0) {
+    //    log_error("pair 0 non block error");
+    //    return NC_ERROR;
+    //}
+
+    //status = nc_set_nonblocking(process->ht_channel[1]);
+    //if (status < 0) {
+    //    log_error("pair 1 non block error");
+    //    return NC_ERROR;
+    //}
+
+    //TODO hash table socketpair
+    struct conn *dummy_conn;
+    dummy_conn = &ctx->processes[i].ht_dummy_conn;
+    dummy_conn->owner = ctx;
+    dummy_conn->dummy = 2;
+    dummy_conn->sd = ctx->processes[i].ht_channel[0];
+    log_error("ht_channel =%d",ctx->processes[i].ht_channel[0]);
+
+    event_add_conn(ctx->evb,  dummy_conn);
 
     pid = fork();
     switch (pid) {
@@ -270,6 +297,7 @@ rstatus_t process_spawn(struct context *ctx, int i) {
         _exit(0);
         break; 
     default:
+        close(ctx->processes[i].ht_channel[1]);
         break;
     }
 

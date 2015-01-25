@@ -939,7 +939,7 @@ find_change(uint32_t key_hash,struct array *change_list){
     while (left < right ){
        middle = left + (right - left) / 2;
        item = array_get(change_list,middle); 
-       log_debug(LOG_DEBUG,"left = %d, middle = %d,, right = %d, middle_value = %ld, key_hash = %ld",
+       log_debug(LOG_DEBUG,"left = %d, middle = %d,, right = %d, middle_value = %u, key_hash = %u",
                     left,middle,right,item->start, key_hash);
        if (item->start <= key_hash){
             left = middle + 1;

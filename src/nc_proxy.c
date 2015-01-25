@@ -163,21 +163,21 @@ proxy_listen(struct context *ctx, struct conn *p)
         return NC_ERROR;
     }
 
-    status = event_add_conn(ctx->evb, p);
-    if (status < 0) {
-        log_error("event add conn p %d on addr '%.*s' failed: %s",
-                  p->sd, pool->addrstr.len, pool->addrstr.data,
-                  strerror(errno));
-        return NC_ERROR;
-    }
+    //status = event_add_conn(ctx->evb, p);
+    //if (status < 0) {
+    //    log_error("event add conn p %d on addr '%.*s' failed: %s",
+    //              p->sd, pool->addrstr.len, pool->addrstr.data,
+    //              strerror(errno));
+    //    return NC_ERROR;
+    //}
 
-    status = event_del_out(ctx->evb, p);
-    if (status < 0) {
-        log_error("event del out p %d on addr '%.*s' failed: %s",
-                  p->sd, pool->addrstr.len, pool->addrstr.data,
-                  strerror(errno));
-        return NC_ERROR;
-    }
+    //status = event_del_out(ctx->evb, p);
+    //if (status < 0) {
+    //    log_error("event del out p %d on addr '%.*s' failed: %s",
+    //              p->sd, pool->addrstr.len, pool->addrstr.data,
+    //              strerror(errno));
+    //    return NC_ERROR;
+    //}
 
     return NC_OK;
 }

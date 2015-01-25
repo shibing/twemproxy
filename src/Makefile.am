@@ -32,6 +32,7 @@ sbin_PROGRAMS = nutcracker
 
 nutcracker_SOURCES =			\
 	nc_core.c nc_core.h		\
+    nc_hashtable.c nc_hashtable.h   \
     nc_process.c nc_process.h   \
 	nc_connection.c nc_connection.h	\
 	nc_client.c nc_client.h		\

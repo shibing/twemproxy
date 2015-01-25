@@ -586,34 +586,41 @@ nc_run(struct instance *nci)
     
     sigemptyset(&set);
 
+    int nsd;
+
     /* run rabbit run */
     for (;;) {
-        sigsuspend(&set);
+        nsd = event_wait(ctx->evb, ctx->timeout);
+        //if (nsd < 0) {
+        //    return nsd;
+        //}
 
-        if (nc_reconfigure) {
-            nc_reconfigure = 0;
-            if(ctx->stats!=NULL && ctx->stats->tid!=-1){
-                log_debug(LOG_VVERB, "set stat exit = 1");
-                ctx->stats->exit = 1;
-                close(ctx->channel[0]);
-                write(ctx->channel[1],"1",1);
-                pthread_join(ctx->stats->tid,NULL);
+        //sigsuspend(&set);
 
-            }
+        //if (nc_reconfigure) {
+        //    nc_reconfigure = 0;
+        //    if(ctx->stats!=NULL && ctx->stats->tid!=-1){
+        //        log_debug(LOG_VVERB, "set stat exit = 1");
+        //        ctx->stats->exit = 1;
+        //        close(ctx->channel[0]);
+        //        write(ctx->channel[1],"1",1);
+        //        pthread_join(ctx->stats->tid,NULL);
 
-            log_debug(LOG_VVERB, "need reconfigure");
-            signal_processes(ctx,NC_RELOAD);
+        //    }
 
-            ctx = core_ctx_update(ctx, nci);
-            /* respawn */
-            int i = 0;
-            for(i =0; i< ctx->worker_num; ++i){
-                process_spawn(ctx,i);
-            } 
+        //    log_debug(LOG_VVERB, "need reconfigure");
+        //    signal_processes(ctx,NC_RELOAD);
 
-            stats_start_aggregator(ctx);
+        //    ctx = core_ctx_update(ctx, nci);
+        //    /* respawn */
+        //    int i = 0;
+        //    for(i =0; i< ctx->worker_num; ++i){
+        //        process_spawn(ctx,i);
+        //    } 
 
-        }
+        //    stats_start_aggregator(ctx);
+
+        //}
 
     }
 

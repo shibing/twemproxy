@@ -229,7 +229,12 @@ core_ctx_create(struct instance *nci)
 
     log_debug(LOG_VVERB, "created ctx %p id %"PRIu32"", ctx, ctx->id);
 
-    pid_t pid; 
+    hash_table_init(&ctx->ht,1023);
+
+    hash_table_set(&ctx->ht,22,3);
+    int16_t v = hash_table_get(&ctx->ht,22);
+    log_error("hash value= %d",v);
+
     int i = 0;
     for(i =0; i< ctx->worker_num; ++i){
         process_spawn(ctx,i);
@@ -239,6 +244,7 @@ core_ctx_create(struct instance *nci)
     if (status != NC_OK) {
         log_error("error start agg");
     }
+
     return ctx;
 }
 
@@ -419,6 +425,29 @@ core_core(void *arg, uint32_t events)
     if (conn->dummy == 1){
         //log_error("dummpy");
         return process_read_channel(conn,events);
+    }
+
+    if (conn->dummy == 2) {
+        ctx = conn->owner;
+        if ( events & EVENT_READ){
+            struct hash_cmd  cmd;
+            read_ht_channel(conn->sd, &cmd);
+            if(cmd.cmd == 0) {
+                int32_t value = hash_table_get(&ctx->ht, cmd.key);
+                cmd.value = value;
+                cmd.cmd = 2;
+                write_ht_channel(conn->sd, &cmd, sizeof(struct hash_cmd));
+                log_error("hashtable lookup sd=%d key = %u value=%d",conn->sd,cmd.key,cmd.value);
+
+            } else if (cmd.cmd == 1) {
+                hash_table_set(&ctx->ht, cmd.key,cmd.value);
+                log_error("hashtable set sd=%d key = %u value=%d",conn->sd,cmd.key,cmd.value);
+            }
+
+
+        }
+
+        return NC_OK;
     }
 
     ctx  = conn_to_ctx(conn);

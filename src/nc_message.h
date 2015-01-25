@@ -244,7 +244,7 @@ struct msg {
     unsigned                            redis:1;         /* redis? */
     struct msg                          *next_msg;       /*for asking mode in migrating */
     struct conf_change_item             *change_item;    /*for asking mode in migrating */
-
+    uint32_t                            mig_key_hash;    /*for migrate mode save the migrating key_hash */    
 
 };
 
