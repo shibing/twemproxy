@@ -186,7 +186,7 @@ core_ctx_create(struct instance *nci)
     }
 
     /* initialize event handling for client, proxy and server */
-    ctx->evb = event_base_create(EVENT_SIZE, &core_core);
+    ctx->evb = event_base_create(EVENT_SIZE, &master_core_core);
     if (ctx->evb == NULL) {
         stats_destroy(ctx->stats);
         server_pool_deinit(&ctx->pool);
@@ -415,8 +415,9 @@ core_timeout(struct context *ctx)
     }
 }
 
+
 rstatus_t
-core_core(void *arg, uint32_t events)
+master_core_core(void *arg, uint32_t events)
 {
     rstatus_t status;
     struct conn *conn = arg;
@@ -447,6 +448,37 @@ core_core(void *arg, uint32_t events)
 
         }
 
+        return NC_OK;
+    }
+
+
+    return NC_OK;
+}
+
+rstatus_t
+core_core(void *arg, uint32_t events)
+{
+    rstatus_t status;
+    struct conn *conn = arg;
+    struct context *ctx;
+    
+
+    if (conn->dummy == 2) {
+        ctx = conn->owner;
+        if ( events & EVENT_READ){
+            struct hash_cmd  cmd;
+            read_ht_channel(conn->sd, &cmd);
+            if (cmd.cmd == 2) {
+                req_forward_migrate(ctx, cmd.conn, cmd.msg, cmd.value);
+            }
+            log_error("cccccccccccc core cmd.cmd=%d,cmd.value=%d conn=%p, msg=%p",cmd.cmd,cmd.value,cmd.conn,cmd.msg);
+
+        }
+
+        return NC_OK;
+    }
+
+    if (conn->dummy!=0){
         return NC_OK;
     }
 
@@ -583,7 +615,7 @@ core_ctx_update(struct context *old_ctx, struct instance *nci)
     }
 
 
-    ctx->evb = event_base_create(EVENT_SIZE, &core_core);
+    ctx->evb = event_base_create(EVENT_SIZE, &master_core_core);
     if (ctx->evb == NULL) {
         stats_destroy(ctx->stats);
         server_pool_deinit(&ctx->pool);

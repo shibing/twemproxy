@@ -47,6 +47,7 @@ void hash_table_set(struct hash_table *ht, uint32_t key, int32_t value) {
     if (head->valid == 0) {
         head->key = key;
         head->value = value;
+        head->valid = 1;
         head->next = NULL;
         return;
     }
@@ -153,7 +154,7 @@ void read_ht_channel(uint8_t channel, struct hash_cmd *cmd)
     msg.msg_control = (caddr_t) &cmsg;
     msg.msg_controllen = sizeof(cmsg);
 
-    n = recvmsg(channel, &msg, 0);
+    n = recvmsg(channel, &msg, MSG_WAITALL);
 
     log_error("socket pair %d",s);
 
@@ -178,20 +179,22 @@ void read_ht_channel(uint8_t channel, struct hash_cmd *cmd)
 
 }
 
-int32_t remote_get(int channel, uint32_t key) {
+void remote_get(int channel, uint32_t key, struct conn *conn, struct msg *msg ) {
     struct hash_cmd cmd;
     struct hash_cmd reply;
     memset(&cmd,0,sizeof(struct hash_cmd));
     cmd.cmd = 0;
     cmd.key = key;
     cmd.value = 0;
+    cmd.conn = conn;
+    cmd.msg = msg;
     write_ht_channel(channel, &cmd, sizeof(struct hash_cmd));
-    read_ht_channel(channel, &reply);
-    int32_t value = -1;
-    if (reply.cmd == 2) {
-        value = reply.value;
-    } 
-    return value;
+    //read_ht_channel(channel, &reply);
+    //int32_t value = -1;
+    //if (reply.cmd == 2) {
+    //    value = reply.value;
+    //} 
+    //return value;
 }
 
 

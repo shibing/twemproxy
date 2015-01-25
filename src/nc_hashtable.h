@@ -40,9 +40,11 @@ struct hash_cmd {
     uint8_t     cmd; //0 get 1 put 2 reply
     uint32_t    key;
     int32_t     value;
+    struct conn *conn;
+    struct msg  *msg;
 };
 
-int32_t remote_get(int channel, uint32_t key);
+void remote_get(int channel, uint32_t key, struct conn *conn, struct msg *msg);
 void read_ht_channel(uint8_t channel, struct hash_cmd *cmd);
 rstatus_t write_ht_channel(int channel, struct hash_cmd *cmd, size_t size);
 

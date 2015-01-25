@@ -159,7 +159,7 @@ void nc_process_init(struct context *ctx){
     int status;
     log_error("process init %d",ctx->current_process_slot);
     struct nc_process *process = &ctx->processes[ctx->current_process_slot];
-    struct conn *dummy_conn;
+    struct conn *dummy_conn, *ht_dummy_conn;
 
     dummy_conn = &process->dummy_conn;
 
@@ -191,6 +191,15 @@ void nc_process_init(struct context *ctx){
         log_error("event add master dummy conn failed");
     }
 
+    ht_dummy_conn->owner = ctx;
+    ht_dummy_conn->dummy = 2;
+    ht_dummy_conn->sd = process->ht_channel[1];
+    status = event_add_conn(process->evb, ht_dummy_conn);
+    status = event_del_out(process->evb, ht_dummy_conn);
+
+    if (status < 0) {
+        log_error("event add master dummy conn failed");
+    }
 
     log_error("pool address=%p, pool count=%d",&ctx->pool,array_n(&ctx->pool));
     array_each(&ctx->pool, print, NULL); 
@@ -262,17 +271,17 @@ rstatus_t process_spawn(struct context *ctx, int i) {
             return NC_ERROR;
     }
 
-    //status = nc_set_nonblocking(process->ht_channel[0]);
-    //if (status < 0) {
-    //    log_error("pair 0 non block error");
-    //    return NC_ERROR;
-    //}
+    status = nc_set_nonblocking(process->ht_channel[0]);
+    if (status < 0) {
+        log_error("pair 0 non block error");
+        return NC_ERROR;
+    }
 
-    //status = nc_set_nonblocking(process->ht_channel[1]);
-    //if (status < 0) {
-    //    log_error("pair 1 non block error");
-    //    return NC_ERROR;
-    //}
+    status = nc_set_nonblocking(process->ht_channel[1]);
+    if (status < 0) {
+        log_error("pair 1 non block error");
+        return NC_ERROR;
+    }
 
     //TODO hash table socketpair
     struct conn *dummy_conn;
@@ -283,6 +292,7 @@ rstatus_t process_spawn(struct context *ctx, int i) {
     log_error("ht_channel =%d",ctx->processes[i].ht_channel[0]);
 
     event_add_conn(ctx->evb,  dummy_conn);
+    status = event_del_out(ctx->evb, dummy_conn);
 
     pid = fork();
     switch (pid) {
