@@ -612,6 +612,10 @@ req_forward_migrate(struct context *ctx, struct conn *c_conn, struct msg *msg, i
     uint32_t keylen;
     struct keypos *kpos;
 
+    if(c_conn->sd < 0) {
+        return;
+    }
+    
     ASSERT(c_conn->client && !c_conn->proxy);
 
     /* enqueue message (request) into client outq, if response is expected */

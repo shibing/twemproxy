@@ -474,8 +474,12 @@ master_core_core(void *arg, uint32_t events)
                 }
 
             }
-            event_del_out(ctx->evb,conn);
-            log_error("event del out evb=%p,conn=%p, sd=%d", ctx->evb, conn,conn->sd);
+
+            if (TAILQ_FIRST(&conn->ht_cmd_q)==NULL){
+                event_del_out(ctx->evb,conn);
+                log_error("event del out evb=%p,conn=%p, sd=%d", ctx->evb, conn,conn->sd);
+            }
+
 
            
         }
@@ -530,8 +534,11 @@ core_core(void *arg, uint32_t events)
 
             }
 
-            event_del_out(ctx->processes[ctx->current_process_slot].evb,conn);
-            log_error("core_core event del out evb=%p,conn=%p, sd=%d pid=%d", ctx->processes[ctx->current_process_slot].evb, conn,conn->sd,getpid());
+            if (TAILQ_FIRST(&conn->ht_cmd_q)==NULL){
+                event_del_out(ctx->processes[ctx->current_process_slot].evb,conn);
+                log_error("core_core event del out evb=%p,conn=%p, sd=%d pid=%d", ctx->processes[ctx->current_process_slot].evb, conn,conn->sd,getpid());
+            }
+
  
         }
 
