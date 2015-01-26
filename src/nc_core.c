@@ -429,24 +429,57 @@ master_core_core(void *arg, uint32_t events)
     }
 
     if (conn->dummy == 2) {
+        log_error("master core core mmmmmmmmmmm");
         ctx = conn->owner;
         if ( events & EVENT_READ){
-            struct hash_cmd  cmd;
-            read_ht_channel(conn->sd, &cmd);
-            if(cmd.cmd == 0) {
-                int32_t value = hash_table_get(&ctx->ht, cmd.key);
-                cmd.value = value;
-                cmd.cmd = 2;
-                write_ht_channel(conn->sd, &cmd, sizeof(struct hash_cmd));
-                log_error("hashtable lookup sd=%d key = %u value=%d",conn->sd,cmd.key,cmd.value);
+            log_error("master core core read.........");
+            log_error("master core core dummy 2 read sd=%d pid=%d",conn->sd,getpid());
+            struct hash_cmd  *cmd;
+            do {
+                cmd = nc_alloc(sizeof(struct hash_cmd));
+                status = read_ht_channel(conn->sd, cmd);
+                if (status==NC_OK){
+                    if(cmd->cmd == 0) {
+                        int32_t value = hash_table_get(&ctx->ht, cmd->key);
+                        cmd->value = value;
+                        cmd->cmd = 2;
 
-            } else if (cmd.cmd == 1) {
-                hash_table_set(&ctx->ht, cmd.key,cmd.value);
-                log_error("hashtable set sd=%d key = %u value=%d",conn->sd,cmd.key,cmd.value);
+                        TAILQ_INSERT_TAIL(&conn->ht_cmd_q, cmd, ht_cmd_tqe);
+                        event_add_out(ctx->evb, conn); 
+                        log_error("event add out evb=%p,conn=%p, sd=%d", ctx->evb, conn,conn->sd);
+
+                        log_error("hashtable lookup sd=%d key = %u value=%d",conn->sd,cmd->key,cmd->value);
+
+                    } else if (cmd->cmd == 1) {
+                        hash_table_set(&ctx->ht, cmd->key,cmd->value);
+                        log_error("hashtable set sd=%d key = %u value=%d",conn->sd,cmd->key,cmd->value);
+                    }
+                }
+            } while (status==NC_OK);
+
+
+       } 
+
+       if (events & EVENT_WRITE) {
+            log_error("master core core .........");
+            struct hash_cmd *htcmd, *nhtcmd;
+            for (htcmd = TAILQ_FIRST(&conn->ht_cmd_q); htcmd != NULL; htcmd = nhtcmd) {
+                nhtcmd = TAILQ_NEXT(htcmd,ht_cmd_tqe);
+                status = write_ht_channel(conn->sd, htcmd, sizeof(struct hash_cmd));
+                if (status == NC_OK){
+                    TAILQ_REMOVE(&conn->ht_cmd_q, htcmd, ht_cmd_tqe);
+                    log_error("ssssssssssssend sd=%d key=%u value=%d dummy=%d",conn->sd,htcmd->key,htcmd->value,conn->dummy);
+                } else {
+                    break;
+                }
+
             }
+            event_del_out(ctx->evb,conn);
+            log_error("event del out evb=%p,conn=%p, sd=%d", ctx->evb, conn,conn->sd);
 
-
+           
         }
+ 
 
         return NC_OK;
     }
@@ -466,13 +499,40 @@ core_core(void *arg, uint32_t events)
     if (conn->dummy == 2) {
         ctx = conn->owner;
         if ( events & EVENT_READ){
+            log_error("core core read.........");
             struct hash_cmd  cmd;
-            read_ht_channel(conn->sd, &cmd);
-            if (cmd.cmd == 2) {
-                req_forward_migrate(ctx, cmd.conn, cmd.msg, cmd.value);
-            }
-            log_error("cccccccccccc core cmd.cmd=%d,cmd.value=%d conn=%p, msg=%p",cmd.cmd,cmd.value,cmd.conn,cmd.msg);
+            do {
+                status = read_ht_channel(conn->sd, &cmd);
+                if(status == NC_OK){
+                    if (cmd.cmd == 2) {
+                        log_error("req_forward_migrate pid=%d",getpid());
+                        req_forward_migrate(ctx, cmd.conn, cmd.msg, cmd.value);
+                    }
+                    log_error("cccccccccccc core cmd.cmd=%d,cmd.value=%d conn=%p, msg=%p",cmd.cmd,cmd.value,cmd.conn,cmd.msg);
+                }
+            } while(status==NC_OK);
 
+        }
+
+        if (events & EVENT_WRITE) {
+            log_error("core core write.........");
+            struct hash_cmd *htcmd, *nhtcmd;
+            for (htcmd = TAILQ_FIRST(&conn->ht_cmd_q); htcmd != NULL; htcmd = nhtcmd) {
+                nhtcmd = TAILQ_NEXT(htcmd,ht_cmd_tqe);
+                status = write_ht_channel(conn->sd, htcmd, sizeof(struct hash_cmd));
+                if (status == NC_OK){
+                    TAILQ_REMOVE(&conn->ht_cmd_q, htcmd, ht_cmd_tqe);
+                    log_error("ssssssssssssend %p",htcmd);
+
+                } else {
+                    break;
+                }
+
+            }
+
+            event_del_out(ctx->processes[ctx->current_process_slot].evb,conn);
+            log_error("core_core event del out evb=%p,conn=%p, sd=%d pid=%d", ctx->processes[ctx->current_process_slot].evb, conn,conn->sd,getpid());
+ 
         }
 
         return NC_OK;

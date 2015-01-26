@@ -191,9 +191,12 @@ void nc_process_init(struct context *ctx){
         log_error("event add master dummy conn failed");
     }
 
+    ht_dummy_conn = &process->ht_dummy_conn[1];
     ht_dummy_conn->owner = ctx;
     ht_dummy_conn->dummy = 2;
     ht_dummy_conn->sd = process->ht_channel[1];
+    TAILQ_INIT(&ht_dummy_conn->ht_cmd_q);
+
     status = event_add_conn(process->evb, ht_dummy_conn);
     status = event_del_out(process->evb, ht_dummy_conn);
 
@@ -283,16 +286,19 @@ rstatus_t process_spawn(struct context *ctx, int i) {
         return NC_ERROR;
     }
 
-    //TODO hash table socketpair
-    struct conn *dummy_conn;
-    dummy_conn = &ctx->processes[i].ht_dummy_conn;
-    dummy_conn->owner = ctx;
-    dummy_conn->dummy = 2;
-    dummy_conn->sd = ctx->processes[i].ht_channel[0];
+    //TODO  memleak here
+    struct conn *ht_dummy_conn;
+    ht_dummy_conn = &ctx->processes[i].ht_dummy_conn[0];
+    //ht_dummy_conn = nc_alloc(sizeof(struct conn));
+    ht_dummy_conn->owner = ctx;
+    ht_dummy_conn->dummy = 2;
+    ht_dummy_conn->sd = ctx->processes[i].ht_channel[0];
+    TAILQ_INIT(&ht_dummy_conn->ht_cmd_q);
+
     log_error("ht_channel =%d",ctx->processes[i].ht_channel[0]);
 
-    event_add_conn(ctx->evb,  dummy_conn);
-    status = event_del_out(ctx->evb, dummy_conn);
+    event_add_conn(ctx->evb,  ht_dummy_conn);
+    status = event_del_out(ctx->evb, ht_dummy_conn);
 
     pid = fork();
     switch (pid) {

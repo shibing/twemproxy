@@ -118,7 +118,7 @@ write_ht_channel(int channel, struct hash_cmd *cmd, size_t size)
     msg.msg_iov = iov;
     msg.msg_iovlen = 1;
     n = sendmsg(channel, &msg, 0);
-    log_error("wwwwwwwww rite n=%d channel=%d",n,channel);
+    log_error("wwwwwwwww rite n=%d channel=%d cmd.cmd=%d,cmd.key=%u cmd.value=%d",n,channel,cmd->cmd,cmd->key,cmd->value);
     if (n == -1) {
         log_error("write channel error %s",strerror(errno));
         return NC_ERROR;
@@ -127,7 +127,8 @@ write_ht_channel(int channel, struct hash_cmd *cmd, size_t size)
 
 }
 
-void read_ht_channel(uint8_t channel, struct hash_cmd *cmd)
+rstatus_t
+read_ht_channel(uint8_t channel, struct hash_cmd *cmd)
 {
     ssize_t             n;
     struct iovec        iov[1];
@@ -154,7 +155,7 @@ void read_ht_channel(uint8_t channel, struct hash_cmd *cmd)
     msg.msg_control = (caddr_t) &cmsg;
     msg.msg_controllen = sizeof(cmsg);
 
-    n = recvmsg(channel, &msg, MSG_WAITALL);
+    n = recvmsg(channel, &msg, 0);
 
     log_error("socket pair %d",s);
 
@@ -175,37 +176,45 @@ void read_ht_channel(uint8_t channel, struct hash_cmd *cmd)
     }
 
 
-    return cmd;
+    return NC_OK; 
 
 }
 
-void remote_get(int channel, uint32_t key, struct conn *conn, struct msg *msg ) {
-    struct hash_cmd cmd;
+void remote_get(int channel, uint32_t key, struct conn *conn, struct msg *msg ,struct conn *conn1) {
+    struct hash_cmd *cmd;
     struct hash_cmd reply;
-    memset(&cmd,0,sizeof(struct hash_cmd));
-    cmd.cmd = 0;
-    cmd.key = key;
-    cmd.value = 0;
-    cmd.conn = conn;
-    cmd.msg = msg;
-    write_ht_channel(channel, &cmd, sizeof(struct hash_cmd));
-    //read_ht_channel(channel, &reply);
-    //int32_t value = -1;
-    //if (reply.cmd == 2) {
-    //    value = reply.value;
-    //} 
-    //return value;
+    cmd = nc_alloc(sizeof(struct hash_cmd));
+    memset(cmd,0,sizeof(struct hash_cmd));
+    cmd->cmd = 0;
+    cmd->key = key;
+    cmd->value = 0;
+    cmd->conn = conn;
+    cmd->msg = msg;
+    TAILQ_INSERT_TAIL(&conn1->ht_cmd_q, cmd, ht_cmd_tqe);
+    struct context *ctx;
+    ctx = conn1->owner;
+    event_add_out(ctx->processes[ctx->current_process_slot].evb, conn1);
+    log_error("remote_get");
+    log_error("event add out evb=%p,conn=%p, sd=%d pid=%d", ctx->processes[ctx->current_process_slot].evb, conn1,conn1->sd,getpid());
 }
 
 
-void remote_set(int channel, uint32_t key, int32_t value) {
-    struct hash_cmd cmd;
+void remote_set(int channel, uint32_t key, int32_t value, struct conn* conn1) {
+    struct hash_cmd *cmd;
     struct hash_cmd *reply;
-    memset(&cmd,0,sizeof(struct hash_cmd));
-    cmd.cmd = 1;
-    cmd.key = key;
-    cmd.value = value;
-    write_ht_channel(channel, &cmd, sizeof(struct hash_cmd));
+    cmd = nc_alloc(sizeof(struct hash_cmd));
+
+    memset(cmd,0,sizeof(struct hash_cmd));
+    cmd->cmd = 1;
+    cmd->key = key;
+    cmd->value = value;
+    TAILQ_INSERT_TAIL(&conn1->ht_cmd_q, cmd, ht_cmd_tqe);
+    struct context *ctx;
+    ctx = conn1->owner;
+    event_add_out(ctx->processes[ctx->current_process_slot].evb, conn1);
+    log_error("event add out evb=%p,conn=%p, sd=%d", ctx->processes[ctx->current_process_slot].evb, conn1,conn1->sd);
+
+    //write_ht_channel(channel, &cmd, sizeof(struct hash_cmd));
 }
 
 

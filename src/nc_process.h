@@ -10,7 +10,7 @@ struct nc_process {
     int                   pair_channel[2];       /* socket pair for watcher process and child process */ 
     int                   channel[2];            /* pipeline for stat child and master */
     struct conn           dummy_conn;            /* dummy connection for socket pair communication */
-    struct conn           ht_dummy_conn;         /* dummy connection for hashtable socket pair communication */
+    struct conn           ht_dummy_conn[2];         /* dummy connection for hashtable socket pair communication */
 
 };
 

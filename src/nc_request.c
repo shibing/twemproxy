@@ -759,7 +759,7 @@ req_forward(struct context *ctx, struct conn *c_conn, struct msg *msg)
     if ( pool->migrating==1){
         uint32_t key_hash = ((struct server_pool *)c_conn->owner)->key_hash( key, keylen);
         log_error("maybe in migrating mode key='%.*s' conn=%p, msg=%p", keylen,key,c_conn,msg);
-        remote_get(ctx->processes[ctx->current_process_slot].ht_channel[1],key_hash,c_conn,msg);
+        remote_get(ctx->processes[ctx->current_process_slot].ht_channel[1],key_hash,c_conn,msg, &ctx->processes[ctx->current_process_slot].ht_dummy_conn[1]);
         return ;
         
     }

@@ -123,6 +123,38 @@ event_del_in(struct event_base *evb, struct conn *c)
 }
 
 int
+event_add_out_lt(struct event_base *evb, struct conn *c)
+{
+    int status;
+    struct epoll_event event;
+    int ep = evb->ep;
+
+    ASSERT(ep > 0);
+    ASSERT(c != NULL);
+    ASSERT(c->sd > 0);
+    ASSERT(c->recv_active);
+
+    if (c->send_active) {
+        log_error("send active =======================true sd=%d",c->sd);
+        return 0;
+    }
+
+    event.events = (uint32_t)(EPOLLIN | EPOLLOUT);
+    event.data.ptr = c;
+
+    status = epoll_ctl(ep, EPOLL_CTL_MOD, c->sd, &event);
+    if (status < 0) {
+        log_error("epoll ctl on e %d sd %d failed: %s", ep, c->sd,
+                  strerror(errno));
+    } else {
+        c->send_active = 1;
+    }
+
+    return status;
+}
+
+
+int
 event_add_out(struct event_base *evb, struct conn *c)
 {
     int status;
@@ -135,6 +167,7 @@ event_add_out(struct event_base *evb, struct conn *c)
     ASSERT(c->recv_active);
 
     if (c->send_active) {
+        log_error("send active =======================true sd=%d",c->sd);
         return 0;
     }
 
@@ -165,6 +198,7 @@ event_del_out(struct event_base *evb, struct conn *c)
     ASSERT(c->recv_active);
 
     if (!c->send_active) {
+        log_error("del out send_active ======================0");
         return 0;
     }
 
@@ -252,8 +286,8 @@ event_wait(struct event_base *evb, int timeout)
                 struct epoll_event *ev = &evb->event[i];
                 uint32_t events = 0;
 
-                log_error("epoll %04"PRIX32" triggered on conn %p pid=%d",
-                          ev->events, ev->data.ptr,getpid());
+                log_error("epoll %04"PRIX32" triggered on conn %p pid=%d sd=%d",
+                          ev->events, ev->data.ptr,getpid(),((struct conn*)ev->data.ptr)->sd);
                 //log_debug(LOG_VVERB, "epoll %04"PRIX32" triggered on conn %p",
 //                          ev->events, ev->data.ptr);
 

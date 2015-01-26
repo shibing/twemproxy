@@ -42,10 +42,14 @@ struct hash_cmd {
     int32_t     value;
     struct conn *conn;
     struct msg  *msg;
+    TAILQ_ENTRY(hash_cmd)                    ht_cmd_tqe;           /* link in client q */
+
 };
 
-void remote_get(int channel, uint32_t key, struct conn *conn, struct msg *msg);
-void read_ht_channel(uint8_t channel, struct hash_cmd *cmd);
+void remote_get(int channel, uint32_t key, struct conn *conn, struct msg *msg, struct conn *conn1);
+rstatus_t read_ht_channel(uint8_t channel, struct hash_cmd *cmd);
 rstatus_t write_ht_channel(int channel, struct hash_cmd *cmd, size_t size);
+
+TAILQ_HEAD(ht_cmd_tqh, hash_cmd);
 
 #endif

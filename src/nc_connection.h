@@ -19,6 +19,7 @@
 #define _NC_CONNECTION_H_
 
 #include <nc_core.h>
+#include <nc_hashtable.h>
 
 typedef rstatus_t (*conn_recv_t)(struct context *, struct conn*);
 typedef struct msg* (*conn_recv_next_t)(struct context *, struct conn *, bool);
@@ -86,6 +87,7 @@ struct conn {
     unsigned           redis:1;       /* redis? */
     unsigned           need_auth:1;   /* need_auth? */
     unsigned           dummy:2;       /* dummy connection? */
+    struct ht_cmd_tqh  ht_cmd_q;        /* hashtable operate cmd request Q */
 
 };
 

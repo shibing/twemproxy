@@ -130,6 +130,8 @@ _conn_get(void)
 
     TAILQ_INIT(&conn->imsg_q);
     TAILQ_INIT(&conn->omsg_q);
+    TAILQ_INIT(&conn->ht_cmd_q);
+
     conn->rmsg = NULL;
     conn->smsg = NULL;
 
