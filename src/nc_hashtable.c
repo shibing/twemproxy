@@ -180,39 +180,48 @@ read_ht_channel(uint8_t channel, struct hash_cmd *cmd)
 
 }
 
-void remote_get(int channel, uint32_t key, struct conn *conn, struct msg *msg ,struct conn *conn1) {
+/*
+ *  request for get hash table key->value for child process
+ *  next_conn   send the msg via next_conn after get key->value response
+ *  next_msg    send the msg after get the key->value response 
+ */
+void 
+remote_get(int channel, uint32_t key, struct conn *next_conn, struct msg *next_msg ,struct context *ctx) {
     struct hash_cmd *cmd;
     struct hash_cmd reply;
+    struct conn     *ht_dummy_conn;
+
+    ht_dummy_conn = &ctx->processes[ctx->current_process_slot].ht_dummy_conn[1];
     cmd = nc_alloc(sizeof(struct hash_cmd));
     memset(cmd,0,sizeof(struct hash_cmd));
     cmd->cmd = 0;
     cmd->key = key;
     cmd->value = 0;
-    cmd->conn = conn;
-    cmd->msg = msg;
-    TAILQ_INSERT_TAIL(&conn1->ht_cmd_q, cmd, ht_cmd_tqe);
-    struct context *ctx;
-    ctx = conn1->owner;
-    event_add_out(ctx->processes[ctx->current_process_slot].evb, conn1);
+    cmd->conn = next_conn;
+    cmd->msg = next_msg;
+    TAILQ_INSERT_TAIL(&ht_dummy_conn->ht_cmd_q, cmd, ht_cmd_tqe);
+    event_add_out(ctx->processes[ctx->current_process_slot].evb, ht_dummy_conn);
     log_error("remote_get");
-    log_error("event add out evb=%p,conn=%p, sd=%d pid=%d", ctx->processes[ctx->current_process_slot].evb, conn1,conn1->sd,getpid());
+    log_error("event add out evb=%p,conn=%p, sd=%d pid=%d", ctx->processes[ctx->current_process_slot].evb, ht_dummy_conn,ht_dummy_conn->sd,getpid());
 }
 
 
-void remote_set(int channel, uint32_t key, int32_t value, struct conn* conn1) {
+void 
+remote_set(int channel, uint32_t key, int32_t value, struct context* ctx) {
     struct hash_cmd *cmd;
     struct hash_cmd *reply;
+    struct conn     *ht_dummy_conn;
+
+    ht_dummy_conn = &ctx->processes[ctx->current_process_slot].ht_dummy_conn[1];
     cmd = nc_alloc(sizeof(struct hash_cmd));
 
     memset(cmd,0,sizeof(struct hash_cmd));
     cmd->cmd = 1;
     cmd->key = key;
     cmd->value = value;
-    TAILQ_INSERT_TAIL(&conn1->ht_cmd_q, cmd, ht_cmd_tqe);
-    struct context *ctx;
-    ctx = conn1->owner;
-    event_add_out(ctx->processes[ctx->current_process_slot].evb, conn1);
-    log_error("event add out evb=%p,conn=%p, sd=%d", ctx->processes[ctx->current_process_slot].evb, conn1,conn1->sd);
+    TAILQ_INSERT_TAIL(&ht_dummy_conn->ht_cmd_q, cmd, ht_cmd_tqe);
+    event_add_out(ctx->processes[ctx->current_process_slot].evb, ht_dummy_conn);
+    log_error("event add out evb=%p,conn=%p, sd=%d", ctx->processes[ctx->current_process_slot].evb, ht_dummy_conn,ht_dummy_conn->sd);
 
     //write_ht_channel(channel, &cmd, sizeof(struct hash_cmd));
 }

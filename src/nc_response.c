@@ -247,8 +247,7 @@ rsp_forward(struct context *ctx, struct conn *s_conn, struct msg *msg)
         //TODO 需要判断是否migrate成功
 
         uint32_t idx = pmsg->change_item->to;
-        remote_set(ctx->processes[ctx->current_process_slot].ht_channel[1], pmsg->mig_key_hash, idx,&ctx->processes[ctx->current_process_slot].ht_dummy_conn[1]);
-
+        remote_set(ctx->processes[ctx->current_process_slot].ht_channel[1], pmsg->mig_key_hash, idx, ctx);
 
         if(idx >= array_n(&pool->server)){
             //something wrong, just use the s_conn owner server
