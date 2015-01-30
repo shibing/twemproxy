@@ -887,6 +887,7 @@ stats_loop(void *arg)
 {
     struct context *ctx = arg;
     event_loop_stats(stats_loop_callback, arg);
+    log_error("exit main stat...............");
     close(ctx->stats->sd);
     return NULL;
 }
@@ -936,6 +937,7 @@ stats_listen(struct stats *st)
 rstatus_t
 stats_start_aggregator(struct context *ctx)
 {
+    log_error("stats_start_aggregator............");
 
     struct stats *st;
     rstatus_t status;

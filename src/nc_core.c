@@ -74,6 +74,8 @@ core_ctx_create(struct instance *nci)
         log_error("start pipeline error");
     }
 
+    //open(ctx->channel[0]);
+    log_error("new pipe 0=  %d",ctx->channel[0]);
 
 //    status = nc_set_nonblocking(ctx->channel[0]);
 
@@ -189,6 +191,9 @@ static void
 core_ctx_destroy(struct context *ctx)
 {
     log_debug(LOG_VVERB, "destroy ctx %p id %"PRIu32"", ctx, ctx->id);
+    close(ctx->channel[0]);
+    close(ctx->channel[1]);
+
     proxy_deinit(ctx);
     server_pool_disconnect(ctx);
     event_base_destroy(ctx->evb);
@@ -451,6 +456,8 @@ core_ctx_update(struct context *old_ctx, struct instance *nci)
         log_error("start pipeline error");
     }
 
+    log_error("update pipe 0=  %d",ctx->channel[0]);
+
 //    status = nc_set_nonblocking(ctx->channel[0]);
 
 
@@ -523,6 +530,10 @@ core_ctx_update(struct context *old_ctx, struct instance *nci)
     core_ctx_destroy(old_ctx);
     ctx->old_ctx = NULL; 
 
+    //status = stats_start_aggregator(ctx);
+    //if (status != NC_OK) {
+    //    log_error("error start agg");
+    //}
 
     return ctx;
 }

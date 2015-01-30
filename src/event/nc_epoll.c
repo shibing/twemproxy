@@ -354,7 +354,14 @@ event_loop_stats(event_stats_cb_t cb, void *arg)
                 cb(ctx, &n);
 
             } else {
-                readbytes = read(ev2[i].data.fd, readbuf, 1);
+                if (ev2[i].events & EPOLLIN) {
+                    readbytes = read(ev2[i].data.fd, readbuf, 1);
+                }
+
+                if (ev2[i].events & EPOLLHUP) {
+                log_error("hup...."); 
+                }
+    
             }
         }
     }
