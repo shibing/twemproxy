@@ -25,16 +25,41 @@ void hash_table_init(struct hash_table *ht, uint16_t size) {
     uint32_t i;
     for(i=0; i<size; ++i){
         struct hash_node *node = array_push(&ht->head);
-        node->valid = 0;
+        memset(node,0,sizeof(struct hash_node));
+        node->next = NULL;
     }
     
 }
 
-void hash_table_deinit(struct hash_table *ht) {
-   //TODO destroy list
-
-    array_destroy(&ht->head); 
+static void
+hash_node_destroy(struct hash_node *node) {
+   struct hash_node *old;
+   while (node!=NULL && node->valid) {
+            log_error("free hash node %p", node);
+            old = node;
+            node = node->next;
+            nc_free(old);
+    }    
 }
+
+void hash_table_deinit(struct hash_table *ht) {
+   //destroy list
+    uint16_t    size;
+    uint32_t    i;
+    size = ht->size;
+    for(i=0; i<size; ++i){
+        struct hash_node *node = array_get(&ht->head, i);
+        if(node->next!= NULL) {
+            node = node->next;
+            hash_node_destroy(node);
+        }
+
+    }
+
+    array_deinit(&ht->head);
+}
+
+
 
 void hash_table_set(struct hash_table *ht, uint32_t key, int32_t value) {
     uint16_t    pos;
@@ -226,6 +251,19 @@ remote_set(int channel, uint32_t key, int32_t value, struct context* ctx) {
     //write_ht_channel(channel, &cmd, sizeof(struct hash_cmd));
 }
 
+void hash_cmd_clear(struct ht_cmd_tqh *ht_cmd_q) {
+    struct hash_cmd     *htcmd, *nhtcmd;
+    struct conn         *conn;
+    log_error("hash cmd clear");
 
+    for (htcmd = TAILQ_FIRST(ht_cmd_q); htcmd != NULL; htcmd = nhtcmd) {
+        nhtcmd = TAILQ_NEXT(htcmd, ht_cmd_tqe);
+        TAILQ_REMOVE(ht_cmd_q, htcmd, ht_cmd_tqe);
+        nc_free(htcmd);
+    }
+
+    
+
+}
 
 

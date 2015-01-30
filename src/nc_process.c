@@ -341,6 +341,10 @@ process_loop(struct context *ctx,int process_index)
 }
 
 void process_deinit(struct context *ctx,int i){
+    struct conn         *conn;
+    conn = &ctx->processes[i].ht_dummy_conn[1];
+    hash_cmd_clear(&conn->ht_cmd_q);
+ 
     log_error("process deinit %d",i);
     close(ctx->processes[i].pair_channel[1]);
 }

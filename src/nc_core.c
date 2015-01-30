@@ -231,10 +231,6 @@ core_ctx_create(struct instance *nci)
 
     hash_table_init(&ctx->ht,1023);
 
-    hash_table_set(&ctx->ht,22,3);
-    int16_t v = hash_table_get(&ctx->ht,22);
-    log_error("hash value= %d",v);
-
     int i = 0;
     for(i =0; i< ctx->worker_num; ++i){
         process_spawn(ctx,i);
@@ -252,6 +248,16 @@ static void
 core_ctx_destroy(struct context *ctx)
 {
     log_debug(LOG_VVERB, "destroy ctx %p id %"PRIu32"", ctx, ctx->id);
+    uint32_t i;
+    struct conn         *conn;
+
+    for(i =0; i< ctx->worker_num; ++i){
+        conn = &ctx->processes[i].ht_dummy_conn[0];
+        hash_cmd_clear(&conn->ht_cmd_q);
+    }
+
+    hash_table_deinit(&ctx->ht);
+
     proxy_deinit(ctx);
     server_pool_disconnect(ctx);
     event_base_destroy(ctx->evb);
@@ -260,6 +266,9 @@ core_ctx_destroy(struct context *ctx)
     conf_destroy(ctx->cf);
 
     munmap(ctx->processes, ctx->worker_num * sizeof(struct nc_process));
+
+
+    
     nc_free(ctx);
 }
 
@@ -423,10 +432,6 @@ master_core_core(void *arg, uint32_t events)
     struct conn *conn = arg;
     struct context *ctx;
     
-    if (conn->dummy == 1){
-        //log_error("dummpy");
-        return process_read_channel(conn,events);
-    }
 
     if (conn->dummy == 2) {
         log_error("master core core mmmmmmmmmmm");
@@ -469,6 +474,8 @@ master_core_core(void *arg, uint32_t events)
                 if (status == NC_OK){
                     TAILQ_REMOVE(&conn->ht_cmd_q, htcmd, ht_cmd_tqe);
                     log_error("ssssssssssssend sd=%d key=%u value=%d dummy=%d",conn->sd,htcmd->key,htcmd->value,conn->dummy);
+                    nc_free(htcmd);
+
                 } else {
                     break;
                 }
@@ -498,6 +505,13 @@ core_core(void *arg, uint32_t events)
     rstatus_t status;
     struct conn *conn = arg;
     struct context *ctx;
+
+    if (conn->dummy == 1){
+        if ( events & EVENT_READ){
+            log_error("dummpy 111111111111");
+            return process_read_channel(conn,events);
+        }
+    }
     
 
     if (conn->dummy == 2) {
@@ -527,6 +541,7 @@ core_core(void *arg, uint32_t events)
                 if (status == NC_OK){
                     TAILQ_REMOVE(&conn->ht_cmd_q, htcmd, ht_cmd_tqe);
                     log_error("ssssssssssssend %p",htcmd);
+                    nc_free(htcmd);
 
                 } else {
                     break;
@@ -709,10 +724,14 @@ core_ctx_update(struct context *old_ctx, struct instance *nci)
                                 MAP_ANON|MAP_SHARED, -1, (size_t)0); 
 
 
+
+
     log_debug(LOG_VVERB, "created ctx %p id %"PRIu32"", ctx, ctx->id);
 
     core_ctx_destroy(old_ctx);
     ctx->old_ctx = NULL; 
+
+    hash_table_init(&ctx->ht,1023);
 
 
     return ctx;

@@ -27,7 +27,7 @@ struct hash_node {
     uint32_t key;
     int32_t value;
     struct hash_node *next;
-    int8_t  valid:1;
+    unsigned  valid:1;
 };
 
 struct hash_table {

@@ -281,6 +281,7 @@ event_wait(struct event_base *evb, int timeout)
         int i, nsd;
 
         nsd = epoll_wait(ep, event, nevent, timeout);
+
         if (nsd > 0) {
             for (i = 0; i < nsd; i++) {
                 struct epoll_event *ev = &evb->event[i];
@@ -321,6 +322,11 @@ event_wait(struct event_base *evb, int timeout)
         }
 
         if (errno == EINTR) {
+            log_error(strerror(errno));
+            if (nc_reconfigure) {
+                return 0;
+            }
+
             continue;
         }
 
