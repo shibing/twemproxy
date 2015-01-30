@@ -576,6 +576,7 @@ nc_run(struct instance *nci)
         return;
     }
 
+    signal(SIGCHLD,SIG_IGN);
     //sigemptyset(&set);
     //sigaddset(&set, SIGUSR2);
     //
