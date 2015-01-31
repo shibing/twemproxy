@@ -889,6 +889,12 @@ stats_loop(void *arg)
     event_loop_stats(stats_loop_callback, arg);
     log_error("exit main stat...............");
     close(ctx->stats->sd);
+    log_error("close channel0 channel1 %d %d",ctx->channel[0],ctx->channel[1]);
+    close(ctx->channel[0]);
+    close(ctx->channel[1]);
+
+    //close(ctx->channel[0]);
+    //close(ctx->channel[1]);
     return NULL;
 }
 

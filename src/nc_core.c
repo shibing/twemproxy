@@ -191,8 +191,9 @@ static void
 core_ctx_destroy(struct context *ctx)
 {
     log_debug(LOG_VVERB, "destroy ctx %p id %"PRIu32"", ctx, ctx->id);
-    close(ctx->channel[0]);
-    close(ctx->channel[1]);
+    //log_error("close channel0 channel1 %d %d",ctx->channel[0],ctx->channel[1]);
+    //close(ctx->channel[0]);
+    //close(ctx->channel[1]);
 
     proxy_deinit(ctx);
     server_pool_disconnect(ctx);
