@@ -405,7 +405,7 @@ event_loop_stats(event_stats_cb_t cb, void *arg)
                 }
 
                 if (ev2[i].events & EPOLLHUP) {
-                log_error("hup...."); 
+                //log_error("hup...."); 
                 }
     
             }

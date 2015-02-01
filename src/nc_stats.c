@@ -893,8 +893,6 @@ stats_loop(void *arg)
     close(ctx->channel[0]);
     close(ctx->channel[1]);
 
-    //close(ctx->channel[0]);
-    //close(ctx->channel[1]);
     return NULL;
 }
 

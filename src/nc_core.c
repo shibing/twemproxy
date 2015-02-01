@@ -189,6 +189,8 @@ core_ctx_create(struct instance *nci)
 
     /* initialize event handling for client, proxy and server */
     ctx->evb = event_base_create(EVENT_SIZE, &master_core_core);
+    log_error("event base =%d",ctx->evb->ep);
+
     if (ctx->evb == NULL) {
         stats_destroy(ctx->stats);
         server_pool_deinit(&ctx->pool);
@@ -244,6 +246,34 @@ core_ctx_create(struct instance *nci)
     }
 
     return ctx;
+}
+
+static void
+core_old_ctx_destroy(struct context *ctx)
+{
+    log_debug(LOG_VVERB, "destroy ctx %p id %"PRIu32"", ctx, ctx->id);
+    uint32_t i;
+    struct conn         *conn;
+
+    for(i =0; i< ctx->worker_num; ++i){
+        conn = &ctx->processes[i].ht_dummy_conn[0];
+        hash_cmd_clear(&conn->ht_cmd_q);
+    }
+
+    hash_table_deinit(&ctx->ht);
+
+    proxy_deinit(ctx);
+    server_pool_disconnect(ctx);
+    //event_base_destroy(ctx->evb);
+    stats_destroy(ctx->stats);
+    server_pool_deinit(&ctx->pool);
+    conf_destroy(ctx->cf);
+
+    munmap(ctx->processes, ctx->worker_num * sizeof(struct nc_process));
+
+
+    
+    nc_free(ctx);
 }
 
 static void
@@ -628,6 +658,8 @@ static rstatus_t print(void *elem, void *data)
 struct context *
 core_ctx_update(struct context *old_ctx, struct instance *nci)
 {
+
+    event_base_destroy(old_ctx->evb);
     rstatus_t   status;
     struct context *ctx;
 
@@ -702,6 +734,8 @@ core_ctx_update(struct context *old_ctx, struct instance *nci)
 
 
     ctx->evb = event_base_create(EVENT_SIZE, &master_core_core);
+    log_error("event base =%d",ctx->evb->ep);
+
     if (ctx->evb == NULL) {
         stats_destroy(ctx->stats);
         server_pool_deinit(&ctx->pool);
@@ -732,7 +766,7 @@ core_ctx_update(struct context *old_ctx, struct instance *nci)
 
     log_debug(LOG_VVERB, "created ctx %p id %"PRIu32"", ctx, ctx->id);
 
-    core_ctx_destroy(old_ctx);
+    core_old_ctx_destroy(old_ctx);
     ctx->old_ctx = NULL; 
 
     hash_table_init(&ctx->ht,1023);

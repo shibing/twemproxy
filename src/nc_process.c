@@ -173,11 +173,11 @@ void nc_process_init(struct context *ctx){
 
     /* close channel[0] */
     if (close(process->pair_channel[0]) == -1) {
-        log_error("close channel 0 failed"); 
+        log_error("close pair channel 0 failed"); 
     }
 
     if (close(process->ht_channel[0]) == -1) {
-        log_error("close channel 0 failed"); 
+        log_error("close ht channel 0 failed"); 
     }
 
 
@@ -269,7 +269,8 @@ rstatus_t process_spawn(struct context *ctx, int i) {
     }
    
 
-    if (socketpair(AF_UNIX, SOCK_STREAM, 0, ctx->processes[i].ht_channel) == -1) {
+
+    if (socketpair(AF_UNIX, SOCK_STREAM, 0, process->ht_channel) == -1) {
             log_error("socketpair() failed while spawn %s",strerror(errno));
             return NC_ERROR;
     }
@@ -288,14 +289,14 @@ rstatus_t process_spawn(struct context *ctx, int i) {
 
     //TODO  memleak here
     struct conn *ht_dummy_conn;
-    ht_dummy_conn = &ctx->processes[i].ht_dummy_conn[0];
+    ht_dummy_conn = &process->ht_dummy_conn[0];
     //ht_dummy_conn = nc_alloc(sizeof(struct conn));
     ht_dummy_conn->owner = ctx;
     ht_dummy_conn->dummy = 2;
-    ht_dummy_conn->sd = ctx->processes[i].ht_channel[0];
+    ht_dummy_conn->sd = process->ht_channel[0];
     TAILQ_INIT(&ht_dummy_conn->ht_cmd_q);
 
-    log_error("ht_channel =%d",ctx->processes[i].ht_channel[0]);
+    log_error("ht_channel =%d",process->ht_channel[0]);
 
     event_add_conn(ctx->evb,  ht_dummy_conn);
     status = event_del_out(ctx->evb, ht_dummy_conn);
@@ -314,6 +315,7 @@ rstatus_t process_spawn(struct context *ctx, int i) {
         break; 
     default:
         close(ctx->processes[i].ht_channel[1]);
+        log_error("close ht channel[1] sd=%d",ctx->processes[i].ht_channel[1]);
         break;
     }
 
@@ -335,6 +337,7 @@ process_loop(struct context *ctx,int process_index)
     for(;;){
         core_loop(ctx); 
         if (nc_exit == 1){
+           
             break;
         }
     }
@@ -347,6 +350,8 @@ void process_deinit(struct context *ctx,int i){
  
     log_error("process deinit %d",i);
     close(ctx->processes[i].pair_channel[1]);
+    close(ctx->processes[i].ht_channel[0]);
+    close(ctx->processes[i].ht_channel[1]);
 }
 
 
