@@ -603,9 +603,18 @@ nc_run(struct instance *nci)
             log_debug(LOG_VVERB, "need reconfigure");
             signal_processes(ctx,NC_RELOAD);
 
-            ctx = core_ctx_update(ctx, nci);
             /* respawn */
             int i = 0;
+            for(i =0; i< ctx->worker_num; ++i){
+                close(ctx->processes[i].pair_channel[0]);
+                close(ctx->processes[i].pair_channel[1]);
+                close(ctx->processes[i].ht_channel[0]);
+                close(ctx->processes[i].ht_channel[1]);
+                log_error("close pair_channel sd=%d,%d ht_channel sd=%d,%d",ctx->processes[i].pair_channel[0],ctx->processes[i].pair_channel[1],ctx->processes[i].ht_channel[0],ctx->processes[i].ht_channel[1]);
+            }
+
+            ctx = core_ctx_update(ctx, nci);
+
             for(i =0; i< ctx->worker_num; ++i){
                 process_spawn(ctx,i);
             } 

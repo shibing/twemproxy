@@ -349,9 +349,9 @@ void process_deinit(struct context *ctx,int i){
     hash_cmd_clear(&conn->ht_cmd_q);
  
     log_error("process deinit %d",i);
+    log_error("close pair_channel[1] sd=%d",ctx->processes[i].pair_channel[1]);
+
     close(ctx->processes[i].pair_channel[1]);
-    close(ctx->processes[i].ht_channel[0]);
-    close(ctx->processes[i].ht_channel[1]);
 }
 
 
