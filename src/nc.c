@@ -577,15 +577,6 @@ nc_run(struct instance *nci)
     }
 
     signal(SIGCHLD,SIG_IGN);
-    //sigemptyset(&set);
-    //sigaddset(&set, SIGUSR2);
-    //
-    //if (sigprocmask(SIG_BLOCK, &set, NULL) == -1) {
-    //    log_error("sigprocmask() failed");
-    //             
-    //}
-    //
-    //sigemptyset(&set);
 
     int nsd;
 
@@ -603,7 +594,7 @@ nc_run(struct instance *nci)
             if(ctx->stats!=NULL && ctx->stats->tid!=-1){
                 log_debug(LOG_VVERB, "set stat exit = 1");
                 ctx->stats->exit = 1;
-                close(ctx->channel[0]);
+                //close(ctx->channel[0]);
                 write(ctx->channel[1],"1",1);
                 pthread_join(ctx->stats->tid,NULL);
 

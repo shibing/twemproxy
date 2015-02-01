@@ -125,6 +125,8 @@ core_ctx_create(struct instance *nci)
         log_error("start pipeline error");
     }
 
+    //open(ctx->channel[0]);
+    log_error("new pipe 0=  %d",ctx->channel[0]);
 
 //    status = nc_set_nonblocking(ctx->channel[0]);
 
@@ -652,6 +654,8 @@ core_ctx_update(struct context *old_ctx, struct instance *nci)
         log_error("start pipeline error");
     }
 
+    log_error("update pipe 0=  %d",ctx->channel[0]);
+
 //    status = nc_set_nonblocking(ctx->channel[0]);
 
 
@@ -732,7 +736,6 @@ core_ctx_update(struct context *old_ctx, struct instance *nci)
     ctx->old_ctx = NULL; 
 
     hash_table_init(&ctx->ht,1023);
-
 
     return ctx;
 }
