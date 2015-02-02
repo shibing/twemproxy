@@ -585,6 +585,7 @@ nc_run(struct instance *nci)
 
         if (nc_reconfigure) {
             nc_reconfigure = 0;
+            nc_reconfiging = 1;
             if(ctx->stats!=NULL && ctx->stats->tid!=-1){
                 log_debug(LOG_VVERB, "set stat exit = 1");
                 ctx->stats->exit = 1;
@@ -605,7 +606,7 @@ nc_run(struct instance *nci)
             } 
 
             stats_start_aggregator(ctx);
-
+            nc_reconfiging = 0;
         }
 
     }

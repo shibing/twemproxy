@@ -16,6 +16,7 @@ struct nc_process {
 #define NC_MAX_PROCESSES         1024
 
 struct nc_process *processes;
+extern sig_atomic_t nc_reconfiging;
 extern sig_atomic_t nc_reconfigure;
 extern uint8_t nc_exit;
 

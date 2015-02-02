@@ -8,6 +8,7 @@
 #include <sys/socket.h>
 #include <sched.h>
 
+sig_atomic_t nc_reconfiging;
 sig_atomic_t nc_reconfigure;
 uint8_t nc_exit;
 
