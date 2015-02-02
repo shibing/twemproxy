@@ -281,6 +281,7 @@ event_wait(struct event_base *evb, int timeout)
         int i, nsd;
 
         nsd = epoll_wait(ep, event, nevent, timeout);
+        log_error("event wait come ..........................................");
 
         if (nsd > 0) {
             for (i = 0; i < nsd; i++) {
@@ -405,7 +406,7 @@ event_loop_stats(event_stats_cb_t cb, void *arg)
                 }
 
                 if (ev2[i].events & EPOLLHUP) {
-                //log_error("hup...."); 
+                log_error("hup...."); 
                 }
     
             }

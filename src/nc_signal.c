@@ -87,8 +87,13 @@ signal_handler(int signo)
         break;
 
     case SIGUSR2:
-        actionstr = ", reconfigure";
-        nc_reconfigure = 1;
+        if (nc_reconfiging == 0) {
+            actionstr = ", reconfigure";
+            nc_reconfigure = 1;
+            log_safe("nc reconfigure ========= %d",nc_reconfigure);
+        } else{
+            log_safe("nc reconfiging ========= %d",nc_reconfiging);
+        }
         break;
 
     case SIGTTIN:

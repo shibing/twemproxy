@@ -583,6 +583,7 @@ nc_run(struct instance *nci)
     /* run rabbit run */
     for (;;) {
         nsd = event_wait(ctx->evb, ctx->timeout);
+        log_error("main loop event come.............. nc_reconfigure=%d", nc_reconfigure);
         if (nsd < 0) {
             return nsd;
         }
@@ -590,13 +591,16 @@ nc_run(struct instance *nci)
         //sigsuspend(&set);
 
         if (nc_reconfigure) {
+            nc_reconfiging = 1;
             nc_reconfigure = 0;
             if(ctx->stats!=NULL && ctx->stats->tid!=-1){
                 log_debug(LOG_VVERB, "set stat exit = 1");
                 ctx->stats->exit = 1;
                 //close(ctx->channel[0]);
                 write(ctx->channel[1],"1",1);
+                log_error("wait for pthread %d",ctx->stats->tid);
                 pthread_join(ctx->stats->tid,NULL);
+                log_error("wait for pthread finished %d",ctx->stats->tid);
 
             }
 
@@ -621,6 +625,7 @@ nc_run(struct instance *nci)
 
             stats_start_aggregator(ctx);
 
+            nc_reconfiging = 0;
         }
 
     }
